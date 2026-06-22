@@ -128,12 +128,12 @@ int initialize() {
 }
 
 int main(int argc, char* argv[]) {
+    int success = initialize();
+
     if (argc < 2) {
         helpCommand(argc, argv);
         return 1;
     }
-
-    int success = initialize();
 
     if (success != 0) {
         std::cerr << vexil::ux::color::red << "Failed to initialize commands" << vexil::ux::color::reset << "\n";
