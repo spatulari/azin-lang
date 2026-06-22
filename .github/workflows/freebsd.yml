@@ -23,4 +23,4 @@ jobs:
             cmake --build build
             output=$(./build/cli/azin version 2>&1)
             echo "$output"
-            echo "$output" | grep -q "azin v0.0.1"
+            echo "$output" | grep -qi "azin 0.0.1"

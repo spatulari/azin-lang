@@ -23,4 +23,4 @@ jobs:
         run: |
           $output = & .\build\cli\Debug\azin.exe version 2>&1
           Write-Output $output
-          if ($output -notmatch "azin v0\.0\.1") { exit 1 }
+          if ($output -notmatch "azin 0\.0\.1") { exit 1 }
