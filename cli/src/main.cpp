@@ -1,4 +1,6 @@
-#include "colors.hpp"
+#include <azin/colors.hpp>
+#include <azin/new.hpp>
+#include <azin/version.hpp>
 #include <algorithm>
 #include <iostream>
 #include <sstream>
@@ -78,13 +80,6 @@ int buildCommand(int argc, char* argv[]) {
     return 0;
 }
 
-/// version 0.0.1 (wow so groundbreaking)
-int versionCommand(int argc, char* argv[]) {
-    (void)argc; (void)argv;
-    std::cout << azin::ux::color::cyan << "Azin 0.0.1" << azin::ux::color::reset << "\n";
-    return 0;
-}
-
 /// helpp please!!!
 int helpCommand(int argc, char* argv[]) {
     (void)argc; (void)argv;
@@ -132,6 +127,7 @@ int initialize() {
     registry.addCommand(Command("build", "Build the project", buildCommand));
     registry.addCommand(Command("test", "Testing command", TestCommand));
     registry.addCommand(Command("version", "Display version information", versionCommand));
+    registry.addCommand(Command("new", "Create a new project <name>", newCommand));
     registry.addCommand(Command("help", "Display help information", helpCommand));
 
     return 0;
