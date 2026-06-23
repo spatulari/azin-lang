@@ -1,4 +1,5 @@
 #include <azin/version.hpp>
+#include <azin/helpers.hpp>
 #include <azin/colors.hpp>
 #include <filesystem>
 #include <functional>
@@ -31,26 +32,18 @@ int main(int argc, char* argv[]) {
     check_arguments(argc, 2, "Usage: azinc <source>");
 
     fs::path source_path = fs::path(argv[1]);
-    if (!fs::exists(source_path)) {
-        std::cerr << azin::ux::color::red << "Source file does not exist: " << source_path << azin::ux::color::reset << "\n";
+    if (azin::filesystem::checkFileExists(source_path) != 0) {
         return 1;
     }
 
-    if (source_path.extension() != ".az") {
-        std::cerr << azin::ux::color::red << "Invalid source file extension!\nFile is not an azin source file " << source_path.extension() << azin::ux::color::reset << "\n";
+    if (azin::filesystem::checkExtension(source_path) != 0) {
         return 1;
     }
 
-
-    std::ifstream source_file(source_path);
-    if (!source_file.is_open()) {
-        std::cerr << azin::ux::color::red << "Failed to open source file: " << source_path << azin::ux::color::reset << "\n";
-        return 1;
-    }
+    std::ifstream source_file = azin::filesystem::openSourceFile(source_path);
 
     std::string source_code((std::istreambuf_iterator<char>(source_file)), std::istreambuf_iterator<char>());
     std::cout << source_code << std::endl;
-
 
     return 0;
 }

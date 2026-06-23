@@ -1,4 +1,6 @@
 add_executable(azinc
+    src/helpers.cpp
+    src/version.cpp
     src/main.cpp
 )
 
