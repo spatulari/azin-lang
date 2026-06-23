@@ -1,19 +1,19 @@
+#include <azin/version.hpp>
 #include <azin/colors.hpp>
 #include <azin/new.hpp>
-#include <azin/version.hpp>
+#include <filesystem>
+#include <functional>
 #include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
 #include <vector>
 #include <string>
-#include <functional>
 #include <memory>
-#include <filesystem>
 
 /// dumbfuck if you cant understand ts
-void handle_error(const std::runtime_error& e) {
-    std::cout << azin::ux::color::red << e.what() << azin::ux::color::reset << std::endl;
+void handle_error(const std::runtime_error& error) {
+    std::cout << azin::ux::color::red << error.what() << azin::ux::color::reset << std::endl;
 }
 
 /// ok so this one might need an explanation but it's pretty self-explanatory for amateurs B)
