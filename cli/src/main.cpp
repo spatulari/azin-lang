@@ -2,6 +2,7 @@
 #include <azin/colors.hpp>
 #include <azin/new.hpp>
 #include <azin/version.hpp>
+#include <cstddef>
 #include <cstdio>
 #include <exception>
 #include <functional>
@@ -28,14 +29,14 @@ public:
     CommandRegistry() = default;
 
     explicit CommandRegistry(std::vector<Command> commands)
-        : commands_(std::move(commands)) {}
-
-    auto add(Command const &command) -> void {
-        commands_.push_back(command);
+        : commands_(std::move(commands)) {
     }
 
-    [[nodiscard]]
-    auto execute(std::string_view const name, Args const args) -> int {
+    auto add(Command command) -> void {
+        commands_.push_back(std::move(command));
+    }
+
+    [[nodiscard]] auto execute(std::string_view const name, Args const args) const -> int {
         auto const cmd_it = std::ranges::find(commands_, name, &Command::name);
 
         if (cmd_it == commands_.end()) {
@@ -47,8 +48,7 @@ public:
         return cmd_it->execute(args);
     }
 
-    [[nodiscard]]
-    auto commands() const -> std::vector<Command> const & {
+    [[nodiscard]] auto commands() const noexcept -> auto const & {
         return commands_;
     }
 
@@ -56,7 +56,7 @@ private:
     std::vector<Command> commands_;
 };
 
-auto help_command(CommandRegistry const &registry, Args /* unused */) -> int {
+auto help_command(CommandRegistry const &registry, Args /* unnamed */) -> int {
     auto const &commands = registry.commands();
 
     std::println("{}Usage: azin <command> [args...]{}\n", azin::ux::color::green,
@@ -122,13 +122,12 @@ auto register_commands(CommandRegistry &registry) -> void {
 
 } // namespace
 
-auto main(int const argc, char const *argv[]) -> int { // NOLINT(bugprone-exception-escape)
+auto main(int const argc, char const *argv[]) noexcept(false) -> int {
     try {
         CommandRegistry registry;
-
         register_commands(registry);
 
-        std::span<char const *const> const argv_span{argv, static_cast<std::size_t>(argc)};
+        std::span const argv_span{argv, static_cast<std::size_t>(argc)};
 
         if (argc < 2) {
             return help_command(registry, {});
@@ -140,9 +139,7 @@ auto main(int const argc, char const *argv[]) -> int { // NOLINT(bugprone-except
         for (auto const *arg : argv_span.subspan(2)) {
             args.emplace_back(arg);
         }
-
-        auto const *const command_name = argv_span[1]; // NOLINT
-        return registry.execute(command_name, args);
+        return registry.execute(argv_span[1], args); // NOLINT
     }
     catch (std::exception const &exception) {
         std::println(stderr, "{}{}{}", azin::ux::color::red, exception.what(),
