@@ -20,7 +20,7 @@ jobs:
           prepare: pkg install -y cmake
           run: |
             cmake -B build
-            cmake --build build -j
+            cmake --build build -j $(nproc)
             output=$(./build/apps/azin/azin version 2>&1)
             echo "$output"
             echo "$output" | grep -qi "azin 0.0.1"
