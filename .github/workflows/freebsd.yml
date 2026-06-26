@@ -17,7 +17,7 @@ jobs:
         with:
           usesh: true
           mem: 4096
-          prepare: pkg install -y cmake
+          prepare: pkg install -y cmake git
           run: |
             cmake -B build
             cmake --build build -j $(nproc)
