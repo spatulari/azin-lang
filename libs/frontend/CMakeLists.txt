@@ -1,5 +1,5 @@
 add_library(frontend_source STATIC
-        source/source.cpp
+        source/src/source.cpp
         source/include/azc/source.hpp
 )
 
