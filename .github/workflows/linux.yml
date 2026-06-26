@@ -29,10 +29,10 @@ jobs:
             -DAZIN_ENABLE_CLANG_TIDY=OFF
 
       - name: Build
-        run: cmake --build build
+        run: cmake --build build -j
 
       - name: Test
         run: |
-          output=$(./build/cli/azin version 2>&1)
+          output=$(./build/apps/azin/azin version 2>&1)
           echo "$output"
           echo "$output" | grep -qi "azin 0.0.1"
