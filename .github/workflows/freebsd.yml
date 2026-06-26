@@ -17,10 +17,10 @@ jobs:
         with:
           usesh: true
           mem: 4096
-          prepare: pkg install -y cmake
+          prepare: pkg install -y cmake git
           run: |
             cmake -B build
             cmake --build build -j $(nproc)
-            output=$(./build/apps/azin/azin version 2>&1)
+            output=$(./build/apps/azc/azc --version 2>&1)
             echo "$output"
-            echo "$output" | grep -qi "azin 0.0.1"
+            echo "$output" | grep -qi "azc 0.1.0"
