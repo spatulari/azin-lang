@@ -5,7 +5,7 @@
 
 auto main(int const argc, char const *const *argv) -> int {
     try {
-        return cli::run(argc, argv);
+        return azc::cli::run(argc, argv);
     }
     catch (CLI::ParseError const& e) {
         return e.get_exit_code();

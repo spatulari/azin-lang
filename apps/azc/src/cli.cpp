@@ -7,6 +7,7 @@
 #include <azin/support/ansi/styled_view.hpp>
 
 namespace ansi = azin::support::ansi;
+namespace cli = azc::cli;
 
 auto cli::run(int const argc, char const* const* argv) -> int {
     CLI::App app{"Azin Compiler"};
