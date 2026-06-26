@@ -21,9 +21,9 @@ jobs:
 
       - name: Test
         run: |
-          $output = (& .\build\apps\azin\Debug\azin.exe version 2>&1) -join "`n"
+          $output = (& .\build\apps\azc\Debug\azc.exe --version 2>&1) -join "`n"
           Write-Output $output
       
-          if ($output -notmatch '0\.0\.1') {
+          if ($output -notmatch '0\.1\.0') {
             throw "Version string not found"
           }
