@@ -9,13 +9,14 @@ namespace azc::frontend {
 
     class lexer {
     public:
-        explicit lexer(std::string_view source);
+        explicit lexer(std::string_view source, std::string_view filename);
 
         [[nodiscard]]
         auto tokenize() -> std::vector<token>;
 
     private:
         std::string_view m_source;
+        std::string_view m_filename;
 
         std::size_t m_position{0};
         std::size_t m_line{1};

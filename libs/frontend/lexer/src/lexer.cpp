@@ -1,11 +1,14 @@
 #include <cctype>
 #include <azc/token.hpp>
 #include <azc/lexer.hpp>
+#include <stdexcept>
+#include <format>
 
 namespace azc::frontend {
 
-lexer::lexer(std::string_view source)
-    : m_source(source) {}
+lexer::lexer(std::string_view source, std::string_view filename)
+    : m_source(source),
+      m_filename(filename) {}
 
 auto lexer::tokenize() -> std::vector<token> {
     std::vector<token> tokens;
@@ -129,7 +132,34 @@ auto lexer::scan_token(std::vector<token>& tokens) -> void {
             break;
 
         case '/':
-            tokens.push_back(make_token(token_kind::slash, start, line, column));
+            if (match('/')) {
+                while (!is_at_end() && peek() != '\n') {
+                    advance();
+                }
+            } else if (match('*')) {
+                while (!is_at_end()) {
+                    if (peek() == '*' && peek_next() == '/') {
+                        advance(); // *
+                        advance(); // /
+                        break;
+                    }
+
+                    advance();
+                }
+
+                if (is_at_end()) {
+                    throw std::runtime_error(
+                        std::format(
+                            "{}:{}:{}: Unterminated block comment.",
+                            m_filename,
+                            line,
+                            column
+                        )
+                    );
+                }
+            } else {
+                tokens.push_back(make_token(token_kind::slash, start, line, column));
+            }
             break;
 
         case '=':
@@ -189,7 +219,22 @@ auto lexer::scan_token(std::vector<token>& tokens) -> void {
             break;
 
         default:
-            break;
+            // temporary, it should continue lexing
+            // with a diagnostic
+            // in the future, we should do this:
+            // main.az:2:11: error: Unexpected character '@'.
+            //
+            // 2 |     var x = 5 @ 10;
+            //   |               ^
+            throw std::runtime_error(
+                std::format(
+                    "{}:{}:{}: Unexpected character '{}'.",
+                    m_filename,
+                    line,
+                    column,
+                    c
+                )
+            );
     }
 }
 
@@ -198,10 +243,11 @@ auto lexer::identifier(std::vector<token>& tokens) -> void {
     const auto line = m_line;
     const auto column = m_column;
 
-    while (std::isalnum(static_cast<unsigned char>(peek())) || peek() == '_')
+    while (std::isalnum(static_cast<unsigned char>(peek())) || peek() == '_') {
         advance();
+    }
 
-    std::string_view text = m_source.substr(start, m_position - start);
+    std::string_view const text = m_source.substr(start, m_position - start);
 
     tokens.push_back(token{
         .kind = identifier_kind(text),
@@ -217,10 +263,11 @@ auto lexer::number(std::vector<token>& tokens) -> void {
     const auto line = m_line;
     const auto column = m_column;
 
-    while (std::isdigit(static_cast<unsigned char>(peek())))
+    while (std::isdigit(static_cast<unsigned char>(peek()))) {
         advance();
+    }
 
-    std::string_view text = m_source.substr(start, m_position - start);
+    std::string_view const text = m_source.substr(start, m_position - start);
 
     tokens.push_back(token{
         .kind = token_kind::integer_literal,
@@ -238,13 +285,24 @@ auto lexer::string(std::vector<token>& tokens) -> void {
 
     advance();
 
-    while (!is_at_end() && peek() != '"')
-        advance();
+    if (is_at_end()) {
+        throw std::runtime_error(
+            std::format(
+                "{}:{}:{}: Unterminated string literal.",
+                m_filename,
+                line,
+                column
+            )
+        );
+    }
 
-    if (!is_at_end())
-        advance();
+    advance();
 
-    std::string_view text = m_source.substr(start, m_position - start);
+    if (!is_at_end()) {
+        advance();
+    }
+
+    std::string_view const text = m_source.substr(start, m_position - start);
 
     tokens.push_back(token{
         .kind = token_kind::string_literal,

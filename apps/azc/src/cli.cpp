@@ -65,7 +65,7 @@ auto cli::run(int const argc, char const *const *argv) -> int {
     }
 
     fmt::println("Loaded {} bytes", source.text().size());
-    frontend::lexer lexer{source.text()};
+    frontend::lexer lexer{source.text(), source.file_name()};
     auto tokens = lexer.tokenize();
 
     for (const auto& token : tokens) {
