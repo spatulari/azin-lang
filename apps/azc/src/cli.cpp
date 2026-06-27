@@ -1,15 +1,25 @@
-#include <azin/support/ansi/styled_view.hpp>
-
 #include <CLI/CLI.hpp>
 #include <azc/cli.hpp>
 #include <azc/source.hpp>
 #include <cstdio> // NOLINT
 #include <filesystem>
-#include <format>
-#include <print>
+#include <fmt/base.h>
+#include <fmt/color.h>
+#include <string_view>
 
-namespace ansi = azin::support::ansi;
 namespace cli = azc::cli;
+
+namespace {
+void errprintln(std::string_view const msg) {
+    fmt::print(stderr, fg(fmt::color::red), "error: {}\n", msg);
+}
+
+template <typename... Args>
+void errorf(fmt::format_string<Args...> fmt_str, Args &&...args) {
+    fmt::print(stderr, fg(fmt::color::red), fmt_str, std::forward<Args>(args)...);
+    fmt::print(stderr, "\n");
+}
+} // namespace
 
 auto cli::run(int const argc, char const *const *argv) -> int {
     CLI::App app{"Azin Compiler"};
@@ -18,34 +28,29 @@ auto cli::run(int const argc, char const *const *argv) -> int {
     std::filesystem::path input;
 
     app.add_flag("--version", version, "Display the compiler's version");
-
     app.add_option("input", input, "Source file to compile");
 
     CLI11_PARSE(app, argc, argv);
 
     if (version) {
-        std::println("azc {}", AZIN_COMPILER_VERSION);
+        fmt::println("azc {}", AZIN_COMPILER_VERSION);
         return 0;
     }
 
     if (input.empty()) {
-        std::println(stderr, "{}", ansi::red("error: no input file specified"));
-        std::println(stderr, "{}", ansi::red("Usage: azc <source>"));
+        errprintln("no input file specified\nUsage: azc <source>");
         return 1;
     }
 
     source::Manager source{input};
 
     if (!source.load()) {
-        std::println("{}", ansi::red(std::format("error: failed to open '{}'", input.string())));
+        errorf("failed to open '{}'", input.string());
         return 1;
     }
 
-    // TODO: lexer parser etc etc
-    std::println("Loaded {} bytes", source.text().size());
-
-    // remove it later
-    std::println("File Content:\n{}", source.text());
+    fmt::println("Loaded {} bytes", source.text().size());
+    fmt::println("File Content:\n{}", source.text());
 
     return 0;
 }
