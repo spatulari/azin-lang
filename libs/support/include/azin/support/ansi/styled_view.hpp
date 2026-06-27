@@ -131,4 +131,5 @@ struct std::formatter<azin::support::ansi::styled_view<N>> : std::formatter<std:
         return std::format_to(out, "{}", azin::support::ansi::code::reset);
     }
 };
+
 // NOLINTEND(*-std-namespace-modification,cert-dcl58-cpp)

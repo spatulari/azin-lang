@@ -1,18 +1,17 @@
-#include <CLI/CLI.hpp>
+#include <azin/support/ansi/styled_view.hpp>
 
-#include <print>
+#include <CLI/CLI.hpp>
+#include <azc/cli.hpp>
+#include <azc/source.hpp>
 #include <cstdio>
 #include <filesystem>
 #include <format>
-
-#include <azc/cli.hpp>
-#include <azc/source.hpp>
-#include <azin/support/ansi/styled_view.hpp>
+#include <print>
 
 namespace ansi = azin::support::ansi;
 namespace cli = azc::cli;
 
-auto cli::run(int const argc, char const* const* argv) -> int {
+auto cli::run(int const argc, char const *const *argv) -> int {
     CLI::App app{"Azin Compiler"};
 
     bool version{false};
