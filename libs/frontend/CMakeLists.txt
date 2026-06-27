@@ -43,9 +43,10 @@ target_include_directories(frontend_lexer PUBLIC
         $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(frontend_lexer PRIVATE
+target_link_libraries(frontend_lexer PUBLIC
         Azin::CompilerFlags
         Azin::Frontend::Token
+        fmt::fmt
 )
 
 #-------------------------------------------------------------------------------

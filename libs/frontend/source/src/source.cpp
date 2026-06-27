@@ -66,4 +66,13 @@ auto Manager::reset() noexcept -> void {
     m_position = 0;
 }
 
+auto Manager::path() const noexcept -> const std::filesystem::path & {
+    return m_path;
+}
+
+auto Manager::file_name() const noexcept -> std::string {
+    return m_path.filename().string();
+}
+
+
 } // namespace source

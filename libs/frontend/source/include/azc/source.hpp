@@ -34,6 +34,12 @@ public:
     [[nodiscard]]
     auto position() const noexcept -> std::size_t;
 
+    [[nodiscard]]
+    auto path() const noexcept -> const std::filesystem::path&;
+
+    [[nodiscard]]
+    auto file_name() const noexcept -> std::string;
+
     auto reset() noexcept -> void;
 
 private:
