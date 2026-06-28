@@ -1,6 +1,6 @@
 add_library(frontend_source STATIC
         source/src/source.cpp
-        source/include/azc/source.hpp
+        source/include/azin/source.hpp
 )
 
 add_library(Azin::Frontend::Source ALIAS frontend_source)
@@ -53,7 +53,7 @@ target_link_libraries(frontend_diagnostic PRIVATE
 
 add_library(frontend_lexer STATIC
         lexer/src/lexer.cpp
-        lexer/include/azc/lexer.hpp
+        lexer/include/azin/lexer.hpp
 )
 
 add_library(Azin::Frontend::Lexer ALIAS frontend_lexer)
@@ -74,7 +74,7 @@ target_link_libraries(frontend_lexer PUBLIC
 
 add_library(frontend_parser STATIC
         parser/src/parser.cpp
-        parser/include/azc/parser.hpp
+        parser/include/azin/parser.hpp
 )
 
 add_library(Azin::Frontend::Parser ALIAS frontend_parser)

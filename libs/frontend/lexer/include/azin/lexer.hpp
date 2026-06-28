@@ -3,8 +3,8 @@
 #include <string_view>
 #include <vector>
 
-#include <azc/token.hpp>
-#include <azc/diagnostic_engine.hpp>
+#include <azin/token.hpp>
+#include <azin/diagnostic_engine.hpp>
 
 namespace azc::frontend {
 
