@@ -50,7 +50,7 @@ namespace azc::frontend {
     private:
         std::string_view m_source;
         std::string_view m_filename;
-        diagnostic_engine& m_diagnostics;
+        diagnostic_engine& m_diagnostics; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
         std::size_t m_position{0};
         std::size_t m_line{1};
         std::size_t m_column{1};
