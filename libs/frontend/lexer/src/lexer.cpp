@@ -250,10 +250,10 @@ auto lexer::scan_token(std::vector<token>& tokens) -> void {
             emit(tokens, token_kind::dot, start, line, column);
             break;
         case '[':
-            emit(tokens, token_kind::left_bracket, line, column);
+            emit(tokens, token_kind::left_bracket, start, line, column);
             break;
         case ']':
-            emit(tokens, token_kind::left_bracket, line, column);
+            emit(tokens, token_kind::left_bracket, start, line, column);
             break;
         case '|':
             if (match('|')) {
