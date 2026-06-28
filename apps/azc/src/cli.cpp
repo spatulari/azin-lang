@@ -1,12 +1,12 @@
 #include <CLI/CLI.hpp>
 #include <azc/cli.hpp>
-#include <azc/source.hpp>
+#include <azin/source.hpp>
 #include <cstdio> // NOLINT
 #include <filesystem>
-#include <azc/lexer.hpp>
-#include <azc/token.hpp>
-#include <azc/diagnostic.hpp>
-#include <azc/diagnostic_engine.hpp>
+#include <azin/lexer.hpp>
+#include <azin/token.hpp>
+#include <azin/diagnostic.hpp>
+#include <azin/diagnostic_engine.hpp>
 
 // Disable the unreachable code warning for MSVC
 #if defined(_MSC_VER) && !defined(__llvm__)

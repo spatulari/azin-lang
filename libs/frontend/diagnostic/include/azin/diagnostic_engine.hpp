@@ -3,7 +3,7 @@
 #include <vector>
 #include <span>
 
-#include <azc/diagnostic.hpp>
+#include <azin/diagnostic.hpp>
 
 namespace azc::frontend {
 

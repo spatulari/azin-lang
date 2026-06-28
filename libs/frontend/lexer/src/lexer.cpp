@@ -1,10 +1,10 @@
 #include <cctype>
-#include <azc/token.hpp>
-#include <azc/lexer.hpp>
+#include <azin/token.hpp>
+#include <azin/lexer.hpp>
 #include <fmt/format.h>
 #include <string_view>
-#include <azc/diagnostic.hpp>
-#include <azc/diagnostic_engine.hpp>
+#include <azin/diagnostic.hpp>
+#include <azin/diagnostic_engine.hpp>
 
 namespace azc::frontend {
 
