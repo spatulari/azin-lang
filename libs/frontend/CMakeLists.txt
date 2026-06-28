@@ -46,6 +46,7 @@ target_sources(frontend_diagnostic PRIVATE
 
 target_link_libraries(frontend_diagnostic PRIVATE
         Azin::CompilerFlags
+        fmt::fmt
 )
 
 #-------------------------------------------------------------------------------
