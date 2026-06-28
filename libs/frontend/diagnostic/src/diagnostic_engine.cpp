@@ -1,7 +1,6 @@
 #include <azin/diagnostic_engine.hpp>
 
 #include <span>
-#include <fmt/format.h>
 
 namespace azc::frontend {
 
