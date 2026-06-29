@@ -1,3 +1,8 @@
+/**
+ * @file token.hpp
+ * @brief Defines lexical token types used by the Azin frontend.
+ */
+
 #pragma once
 
 #include <cstddef>
@@ -6,6 +11,13 @@
 
 namespace azc::frontend {
 
+    /**
+     * @brief Enumerates every token recognized by the lexer.
+     *
+     * Each value represents a distinct lexical element of the Azin language,
+     * including identifiers, literals, keywords, operators, delimiters,
+     * and the end-of-file marker.
+     */
     enum class token_kind: std::uint8_t {
         // Identifiers & literals
         identifier,
@@ -61,6 +73,15 @@ namespace azc::frontend {
         eof,
     };
 
+
+    /**
+     * @brief Returns a human-readable name for a token kind.
+     *
+     * Primarily intended for debugging, diagnostics, and logging.
+     *
+     * @param kind Token kind.
+     * @return String representation of the token kind.
+     */
     [[nodiscard]]
     constexpr auto token_kind_to_string(token_kind kind) noexcept -> std::string_view {
         switch (kind) {
@@ -120,7 +141,12 @@ namespace azc::frontend {
         return "unknown";
     }
 
-
+    /**
+     * @brief Represents a lexical token produced by the lexer.
+     *
+     * A token stores its type, the corresponding source text,
+     * and its location within the original source file.
+     */
     struct token {
         token_kind kind;
         std::string_view lexeme;
