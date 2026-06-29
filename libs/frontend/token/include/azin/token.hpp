@@ -130,6 +130,7 @@ namespace azc::frontend {
             case token_kind::left_brace:       return "left_brace";
             case token_kind::right_brace:      return "right_brace";
             case token_kind::comma:            return "comma";
+            case token_kind::dot:              return "dot";
             case token_kind::semicolon:        return "semicolon";
             case token_kind::colon:            return "colon";
             case token_kind::right_bracket:    return "right_bracket";
