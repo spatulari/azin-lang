@@ -57,9 +57,6 @@ namespace azc::frontend {
         ampersand,
         caret, // ^, bitwise XOR
         tilde, // ~, bitwise NOT
-        dot,
-        left_bracket,
-        right_bracket,
 
         // Delimiters
         left_paren,
@@ -69,6 +66,9 @@ namespace azc::frontend {
         comma,
         semicolon,
         colon,
+        dot,
+        left_bracket,
+        right_bracket,
 
         eof,
     };
@@ -121,8 +121,6 @@ namespace azc::frontend {
             case token_kind::pipe:             return "pipe";
             case token_kind::caret:            return "caret";
             case token_kind::tilde:            return "tilde";
-            case token_kind::right_bracket:    return "right_bracket";
-            case token_kind::left_bracket:     return "left_bracket";
             case token_kind::logical_or:       return "logical_or";
             case token_kind::logical_and:      return "logical_and";
 
@@ -134,6 +132,8 @@ namespace azc::frontend {
             case token_kind::comma:            return "comma";
             case token_kind::semicolon:        return "semicolon";
             case token_kind::colon:            return "colon";
+            case token_kind::right_bracket:    return "right_bracket";
+            case token_kind::left_bracket:     return "left_bracket";
 
             case token_kind::eof:              return "eof";
         }
