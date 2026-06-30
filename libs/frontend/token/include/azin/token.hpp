@@ -50,6 +50,13 @@ namespace azc::frontend {
         greater,
         greater_equal,
         arrow,
+        modulo,
+        pipe,
+        logical_or,
+        logical_and,
+        ampersand,
+        caret, // ^, bitwise XOR
+        tilde, // ~, bitwise NOT
 
         // Delimiters
         left_paren,
@@ -59,6 +66,9 @@ namespace azc::frontend {
         comma,
         semicolon,
         colon,
+        dot,
+        left_bracket,
+        right_bracket,
 
         eof,
     };
@@ -106,6 +116,13 @@ namespace azc::frontend {
             case token_kind::greater:          return "greater";
             case token_kind::greater_equal:    return "greater_equal";
             case token_kind::arrow:            return "arrow";
+            case token_kind::modulo:           return "modulo";
+            case token_kind::ampersand:        return "ampersand";
+            case token_kind::pipe:             return "pipe";
+            case token_kind::caret:            return "caret";
+            case token_kind::tilde:            return "tilde";
+            case token_kind::logical_or:       return "logical_or";
+            case token_kind::logical_and:      return "logical_and";
 
             // Delimiters
             case token_kind::left_paren:       return "left_paren";
@@ -113,8 +130,11 @@ namespace azc::frontend {
             case token_kind::left_brace:       return "left_brace";
             case token_kind::right_brace:      return "right_brace";
             case token_kind::comma:            return "comma";
+            case token_kind::dot:              return "dot";
             case token_kind::semicolon:        return "semicolon";
             case token_kind::colon:            return "colon";
+            case token_kind::right_bracket:    return "right_bracket";
+            case token_kind::left_bracket:     return "left_bracket";
 
             case token_kind::eof:              return "eof";
         }
