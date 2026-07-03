@@ -258,7 +258,39 @@ auto lexer::scan_token(std::vector<token>& tokens) -> void {
         case ':':
             emit(tokens, token_kind::colon, start, line, column);
             break;
-
+        case '%':
+            emit(tokens, token_kind::modulo, start, line, column);
+            break;
+        case '^':
+            emit(tokens, token_kind::caret, start, line, column);
+            break;
+        case '~':
+            emit(tokens, token_kind::tilde, start, line, column);
+            break;
+        case '.':
+            emit(tokens, token_kind::dot, start, line, column);
+            break;
+        case '[':
+            emit(tokens, token_kind::left_bracket, start, line, column);
+            break;
+        case ']':
+            emit(tokens, token_kind::right_bracket, start, line, column);
+            break;
+        case '|':
+            if (match('|')) {
+                emit(tokens, token_kind::logical_or, start, line, column);
+            } else {
+                emit(tokens, token_kind::pipe, start, line, column);
+            }
+            break;
+        case '&':
+            if (match('&')) {
+                emit(tokens, token_kind::logical_and, start, line, column);
+            } else {
+                emit(tokens, token_kind::ampersand, start, line, column);
+            }
+            break;
+        
         default:
             // temporary, it should continue lexing
             // with a diagnostic
