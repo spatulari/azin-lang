@@ -20,20 +20,20 @@ jobs:
   build:
     name: Build and test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     defaults:
       run:
         shell: bash
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Clang 22 (Linux only)
+      - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
@@ -42,39 +42,56 @@ jobs:
           chmod +x llvm.sh
           sudo ./llvm.sh 22 all
 
-      - name: Configure CMake
+      - name: Install Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
         run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-             -DCMAKE_C_COMPILER=clang-22 -DCMAKE_CXX_COMPILER=clang++-22 \
-             -DAZIN_ENABLE_CLANG_TIDY=OFF
-          else
-            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
-          fi
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_C_COMPILER=clang-22 \
+            -DCMAKE_CXX_COMPILER=clang++-22 \
+            -DAZIN_ENABLE_CLANG_TIDY=OFF
 
-      - name: Build
-        run: cmake --build build --config ${{ env.BUILD_TYPE }} -j 4
-
-      - name: Test
+      - name: Configure (macOS)
+        if: runner.os == 'macOS'
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            EXE=./build/apps/azc/azc.exe
-          else
-            EXE=./build/apps/azc/azc
-          fi
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
 
-          pwd
-          ls -l ./build/apps/azc
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
 
-          "$EXE" --version
-          echo "Exit code: $?"
-      
-          output=$("$EXE" --version 2>&1)
-          echo "$output"  
-          
-          if echo "$output" | grep -qi "azc 0.1.0"; then
-            echo "Version check passed!"
-          else
-            echo "Version string not found!"
-            exit 1
-          fi
+      - name: Build (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cmake --build build -j $(nproc)
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake --build build --config ${{ env.BUILD_TYPE }}
+
+      - name: Test (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          output=$(./build/apps/azc/azc --version)
+          echo "$output"
+          echo "$output" | grep -qi "azc 0.1.0"
+
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $output = .\build\apps\azc\Release\azc.exe --version
+          $output
+
+          if ($output -notmatch 'azc 0\.1\.0') {
+            throw "Version string not found!"
+          }
