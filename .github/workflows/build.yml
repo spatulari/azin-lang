@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Clang 22 (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lsb-release wget software-properties-common gnupg ninja-build
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22 all
+
+      - name: Configure CMake
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+             -DCMAKE_C_COMPILER=clang-22 -DCMAKE_CXX_COMPILER=clang++-22 \
+             -DAZIN_ENABLE_CLANG_TIDY=OFF
+          else
+            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+          fi
+
+      - name: Build
+        run: cmake --build build --config ${{ env.BUILD_TYPE }} -j 4
+
+      - name: Test
+        run: |
+          output=$(./build/apps/azc/azc --version 2>&1)
+          echo "$output"
+          
+          if echo "$output" | grep -qi "azc 0.1.0"; then
+            echo "Version check passed!"
+          else
+            echo "Version string not found!"
+            exit 1
+          fi
