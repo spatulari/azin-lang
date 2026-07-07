@@ -2,9 +2,13 @@ name: Windows
 
 on:
   push:
-    branches: [main, dev]
+    branches: [ main, dev ]
   pull_request:
-    branches: [main, dev]
+    branches: [ main, dev ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -23,7 +27,7 @@ jobs:
         run: |
           $output = (& .\build\apps\azc\Debug\azc.exe --version 2>&1) -join "`n"
           Write-Output $output
-      
+          
           if ($output -notmatch '0\.1\.0') {
             throw "Version string not found"
           }
