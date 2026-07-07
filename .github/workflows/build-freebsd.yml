@@ -12,7 +12,9 @@ concurrency:
 
 jobs:
   build:
+    name: Build and test (FreeBSD)
     runs-on: ubuntu-latest
+    
     steps:
       - uses: actions/checkout@v4
 
@@ -21,10 +23,17 @@ jobs:
         with:
           usesh: true
           mem: 4096
-          prepare: pkg install -y cmake git
+          prepare: pkg install -y cmake git ninja
           run: |
-            cmake -B build
-            cmake --build build -j $(nproc)
+            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+            cmake --build build --config Release -j $(nproc)
+            
             output=$(./build/apps/azc/azc --version 2>&1)
             echo "$output"
-            echo "$output" | grep -qi "azc 0.1.0"
+            
+            if echo "$output" | grep -qi "azc 0.1.0"; then
+              echo "Version check passed!"
+            else
+              echo "Version string not found!"
+              exit 1
+            fi
