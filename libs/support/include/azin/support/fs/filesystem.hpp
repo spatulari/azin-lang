@@ -28,7 +28,7 @@ struct FileError {
  * @brief Result of a filesystem operation.
  *
  * A successful result contains no value. On failure, the contained
- * ::FileError describes the reason the operation could not be completed.
+ * `FileError` describes the reason the operation could not be completed.
  */
 using Result = std::expected<void, FileError>;
 
