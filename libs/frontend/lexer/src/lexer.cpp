@@ -418,7 +418,6 @@ auto lexer::number(std::vector<token>& tokens) -> void {
         .column = column
     });
 }
-
 auto lexer::string(std::vector<token>& tokens) -> void {
     const auto start = m_position;
     const auto line = m_line;
@@ -430,18 +429,16 @@ auto lexer::string(std::vector<token>& tokens) -> void {
         advance();
     }
 
-    if (is_at_end()) {
+    if (is_at_end() || peek() == '\n') {
         m_diagnostics.report({
             .severity = diagnostic_severity::error,
             .message = fmt::format(
                 "{}:{}:{}: Unterminated string literal.",
-                m_filename,
-                line,
-                column
+                m_filename, line, column
             )
         });
 
-        recover_to('"');
+        if (!is_at_end()) recover_to('\n');
         return;
     }
 
@@ -472,20 +469,20 @@ auto lexer::make_token(
         .column = column
     };
 }
+auto lexer::identifier_kind(std::string_view lexeme) noexcept -> token_kind {
+    static const std::unordered_map<std::string_view, token_kind> keywords = {
+        {"fn", token_kind::kw_fn},
+        {"var", token_kind::kw_var},
+        {"return", token_kind::kw_return},
+        {"end", token_kind::kw_end},
+        {"char", token_kind::kw_char},
+        {"int", token_kind::kw_int},
+        {"float", token_kind::kw_float},
+        {"string", token_kind::kw_string},
+    };
 
-auto lexer::identifier_kind(std::string_view lexeme) noexcept
-    -> token_kind {
-
-    if (lexeme == "fn")     return token_kind::kw_fn;
-    if (lexeme == "var")    return token_kind::kw_var;
-    if (lexeme == "return") return token_kind::kw_return;
-    if (lexeme == "end")    return token_kind::kw_end;
-    if (lexeme == "char")   return token_kind::kw_char;
-    if (lexeme == "int")    return token_kind::kw_int;
-    if (lexeme == "float")  return token_kind::kw_float;
-    if (lexeme == "string") return token_kind::kw_string;
-
-    return token_kind::identifier;
+    auto it = keywords.find(lexeme);
+    return it != keywords.end() ? it->second : token_kind::identifier;
 }
 
 } // namespace azc::frontend
