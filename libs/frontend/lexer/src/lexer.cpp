@@ -389,7 +389,7 @@ auto lexer::number(std::vector<token>& tokens) -> void {
         return;
     }
 
-    advance(); // character
+    advance(); // character content
 
     if (peek() != '\'') {
         m_diagnostics.report({
