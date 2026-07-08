@@ -31,31 +31,15 @@ struct FileError {
 using Result = std::expected<void, FileError>;
 
 /**
- * @brief Result of opening a source file.
- *
- * On success, contains an input stream opened for reading. On failure,
- * contains a ::FileError describing the reason the file could not be
- * opened.
+ * @brief Result of reading a source file.
+ * Contains the full source string on success.
  */
-using FileResult = std::expected<std::ifstream, FileError>;
+using FileResult = std::expected<std::string, FileError>;
 
 /**
- * @brief Opens an Azin source file.
- *
- * Before opening the file, this function verifies that:
- * - the path refers to an existing regular file,
- * - the file has a supported source extension (`.az`),
- * - the file can be opened for reading.
- *
- * The returned stream is opened in binary mode and positioned at the
- * beginning of the file.
- *
- * @param source_path Path to the source file.
- *
- * @return An input stream on success; otherwise a ::FileError describing
- *         why the operation failed.
+ * @brief Reads an Azin source file entirely into memory.
  */
 [[nodiscard]]
-auto open_source_file(std::filesystem::path const &source_path) -> FileResult;
+auto read_source_file(std::filesystem::path const &source_path) -> FileResult;
 
 } // namespace azin::support::fs

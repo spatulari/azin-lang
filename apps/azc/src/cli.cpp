@@ -1,3 +1,5 @@
+#include "azin/support/fs/filesystem.hpp"
+
 #include <azin/diagnostic.hpp>
 #include <azin/diagnostic_engine.hpp>
 #include <azin/lexer.hpp>
@@ -39,16 +41,9 @@ void errprintln(std::string_view const msg) {
     fmt::print(stderr, fg(fmt::color::red), "error: {}\n", msg);
 }
 
-auto print_token_stream(std::span<azc::frontend::token const> tokens) -> void {
-    for (auto const &token : tokens) {
-        fmt::println("{} \"{}\" ({}:{})", azc::frontend::token_kind_to_string(token.kind),
-                     token.lexeme, token.line, token.column);
-    }
-}
-
 auto print_diagnostics(std::span<azc::frontend::diagnostic const> diagnostics) -> void {
-    for (auto const &diagnostic : diagnostics) {
-        errorf("{}", diagnostic.message);
+    for (auto const &[_, message] : diagnostics) {
+        errorf("{}", message);
     }
 }
 
@@ -77,25 +72,29 @@ auto cli::run(int const argc, char const *const *argv) -> int {
         return 1;
     }
 
-    source::manager source{input};
-
-    if (!source.load()) {
-        errorf("failed to open '{}'", input.string());
+    auto file_result = azin::support::fs::read_source_file(input);
+    if (!file_result) {
+        errorf("{}", file_result.error().message);
         return 1;
     }
 
+    source::manager source{std::move(*file_result), input};
     fmt::println("Loaded {} bytes", source.text().size());
 
     frontend::diagnostic_engine diagnostics;
-
     frontend::lexer lexer{source.text(), source.file_name(), diagnostics};
-    auto tokens = lexer.tokenize();
+
+    if (print_tokens) {
+        frontend::token t;
+        do {
+            t = lexer.next_token();
+            fmt::println("{} \"{}\" ({}:{})", azc::frontend::token_kind_to_string(t.kind),
+                         lexer.get_lexeme(t), t.line, t.column);
+        }
+        while (t.kind != frontend::token_kind::eof);
+    }
 
     print_diagnostics(diagnostics.diagnostics());
 
-    if (print_tokens) {
-        print_token_stream(tokens);
-    }
-
-    return 0;
+    return diagnostics.has_errors() ? 1 : 0;
 }

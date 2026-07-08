@@ -82,7 +82,7 @@ enum class token_kind : std::uint8_t {
  * @return String representation of the token kind.
  */
 [[nodiscard]]
-constexpr auto token_kind_to_string(token_kind kind) noexcept -> std::string_view {
+constexpr auto token_kind_to_string(token_kind const kind) noexcept -> std::string_view {
     switch (kind) {
     // Identifiers & literals
     case token_kind::identifier:
@@ -193,8 +193,7 @@ constexpr auto token_kind_to_string(token_kind kind) noexcept -> std::string_vie
  */
 struct token {
     token_kind kind;
-    std::string_view lexeme;
-
+    std::size_t length;
     std::size_t offset;
     std::size_t line;
     std::size_t column;

@@ -1,8 +1,8 @@
 #include <azin/support/fs/filesystem.hpp>
 
-#include <filesystem>
 #include <fstream>
 #include <ios>
+#include <iterator>
 
 namespace azin::support::fs {
 
@@ -26,7 +26,7 @@ auto validate_source_file(std::filesystem::path const &source_path) -> Result {
 
 } // namespace
 
-auto open_source_file(std::filesystem::path const &source_path) -> FileResult {
+auto read_source_file(std::filesystem::path const &source_path) -> FileResult {
     if (auto result = validate_source_file(source_path); !result) {
         return std::unexpected(result.error());
     }
@@ -37,7 +37,11 @@ auto open_source_file(std::filesystem::path const &source_path) -> FileResult {
         return std::unexpected(FileError{"Failed to open source file: " + source_path.string()});
     }
 
-    return file;
+    // Read the entire file into a string
+    std::string buffer;
+    buffer.assign(std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{});
+
+    return buffer;
 }
 
 } // namespace azin::support::fs

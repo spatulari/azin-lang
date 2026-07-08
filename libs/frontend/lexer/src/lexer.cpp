@@ -9,15 +9,18 @@
 
 namespace azc::frontend {
 
-lexer::lexer(std::string_view source, std::string_view filename, diagnostic_engine &diagnostics)
+lexer::lexer(std::string_view const source, std::string_view const filename,
+             diagnostic_engine &diagnostics)
     : m_source(source)
     , m_filename(filename)
     , m_diagnostics(diagnostics) {
 }
 
-auto lexer::tokenize() -> std::vector<token> {
-    std::vector<token> tokens;
+auto lexer::get_lexeme(token const &t) const noexcept -> std::string_view {
+    return m_source.substr(t.offset, t.length);
+}
 
+auto lexer::next_token() -> token {
     while (!is_at_end()) {
         skip_whitespace();
 
@@ -25,16 +28,14 @@ auto lexer::tokenize() -> std::vector<token> {
             break;
         }
 
-        scan_token(tokens);
+        if (auto const tok = scan_token()) {
+            return *tok;
+        }
+        // If scan_token returned nullopt, it means we hit an error.
+        // We already reported the diagnostic, so we just loop to the next token.
     }
 
-    tokens.emplace_back(token{.kind = token_kind::eof,
-                              .lexeme = "",
-                              .offset = m_position,
-                              .line = m_line,
-                              .column = m_column});
-
-    return tokens;
+    return make_token(token_kind::eof, m_position, m_line, m_column);
 }
 
 auto lexer::is_at_end() const noexcept -> bool {
@@ -51,7 +52,6 @@ auto lexer::peek_next() const noexcept -> char {
 
 auto lexer::advance() noexcept -> char {
     char const c = m_source[m_position++];
-
     if (c == '\n') {
         ++m_line;
         m_column = 1;
@@ -59,36 +59,15 @@ auto lexer::advance() noexcept -> char {
     else {
         ++m_column;
     }
-
     return c;
 }
 
-auto lexer::match(char expected) noexcept -> bool {
-    if (is_at_end()) {
+auto lexer::match(char const expected) noexcept -> bool {
+    if (is_at_end() || peek() != expected) {
         return false;
     }
-
-    if (peek() != expected) {
-        return false;
-    }
-
     advance();
     return true;
-}
-
-auto lexer::recover_to(char delimiter) noexcept -> void {
-    while (!is_at_end()) {
-        if (peek() == delimiter) {
-            advance(); // consume delimiter
-            return;
-        }
-
-        if (peek() == '\n') {
-            return;
-        }
-
-        advance();
-    }
 }
 
 auto lexer::skip_whitespace() noexcept -> void {
@@ -100,19 +79,26 @@ auto lexer::skip_whitespace() noexcept -> void {
         case '\n':
             advance();
             break;
-
         default:
             return;
         }
     }
 }
 
-auto lexer::emit(std::vector<token> &tokens, token_kind kind, std::size_t start, std::size_t line,
-                 std::size_t column) const -> void {
-    tokens.emplace_back(make_token(kind, start, line, column));
+auto lexer::recover_to(char const delimiter) noexcept -> void {
+    while (!is_at_end()) {
+        if (peek() == delimiter) {
+            advance();
+            return;
+        }
+        if (peek() == '\n') {
+            return;
+        }
+        advance();
+    }
 }
 
-auto lexer::scan_token(std::vector<token> &tokens) -> void {
+auto lexer::scan_token() -> std::optional<token> {
     auto const start = m_position;
     auto const line = m_line;
     auto const column = m_column;
@@ -120,190 +106,105 @@ auto lexer::scan_token(std::vector<token> &tokens) -> void {
     char c = peek();
 
     if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
-        identifier(tokens);
-        return;
+        return identifier();
     }
-
     if (std::isdigit(static_cast<unsigned char>(c))) {
-        number(tokens);
-        return;
+        return number();
     }
-
     if (c == '\'') {
-        character(tokens);
-        return;
+        return character();
     }
-
     if (c == '"') {
-        string(tokens);
-        return;
+        return string();
     }
 
     c = advance();
 
     switch (c) {
-    // it doesn't support escape characters like '\n' (yet)
     case '+':
-        emit(tokens, token_kind::plus, start, line, column);
-        break;
-
+        return make_token(token_kind::plus, start, line, column);
     case '-':
-        if (match('>')) {
-            emit(tokens, token_kind::arrow, start, line, column);
-        }
-        else {
-            emit(tokens, token_kind::minus, start, line, column);
-        }
-        break;
-
+        return make_token(match('>') ? token_kind::arrow : token_kind::minus, start, line, column);
     case '*':
-        emit(tokens, token_kind::star, start, line, column);
-        break;
-
-    case '/':
+        return make_token(token_kind::star, start, line, column);
+    case '/': {
         if (match('/')) {
             while (!is_at_end() && peek() != '\n') {
                 advance();
             }
+            return std::nullopt;
         }
-        else if (match('*')) {
+        if (match('*')) {
             while (!is_at_end()) {
                 if (peek() == '*' && peek_next() == '/') {
-                    advance(); // *
-                    advance(); // /
+                    advance();
+                    advance();
                     break;
                 }
-
                 advance();
             }
-
             if (is_at_end()) {
-                m_diagnostics.report(
-                    {.severity = diagnostic_severity::error,
-                     .message = fmt::format("{}:{}:{}: Unterminated block comment.", m_filename,
-                                            line, column)});
-
-                return;
+                m_diagnostics.report({diagnostic_severity::error,
+                                      fmt::format("{}:{}:{}: Unterminated block comment.",
+                                                  m_filename, line, column)});
             }
+            return std::nullopt;
         }
-        else {
-            emit(tokens, token_kind::slash, start, line, column);
-        }
-        break;
-
+    }
+        return make_token(token_kind::slash, start, line, column);
     case '=':
-        if (match('=')) {
-            emit(tokens, token_kind::equal_equal, start, line, column);
-        }
-        else {
-            emit(tokens, token_kind::equal, start, line, column);
-        }
-        break;
-
+        return make_token(match('=') ? token_kind::equal_equal : token_kind::equal, start, line,
+                          column);
     case '!':
-        if (match('=')) {
-            emit(tokens, token_kind::bang_equal, start, line, column);
-        }
-        else {
-            emit(tokens, token_kind::bang, start, line, column);
-        }
-        break;
-
+        return make_token(match('=') ? token_kind::bang_equal : token_kind::bang, start, line,
+                          column);
     case '<':
-        if (match('=')) {
-            emit(tokens, token_kind::less_equal, start, line, column);
-        }
-        else {
-            emit(tokens, token_kind::less, start, line, column);
-        }
-        break;
-
+        return make_token(match('=') ? token_kind::less_equal : token_kind::less, start, line,
+                          column);
     case '>':
-        if (match('=')) {
-            emit(tokens, token_kind::greater_equal, start, line, column);
-        }
-        else {
-            emit(tokens, token_kind::greater, start, line, column);
-        }
-        break;
-
+        return make_token(match('=') ? token_kind::greater_equal : token_kind::greater, start, line,
+                          column);
     case '(':
-        emit(tokens, token_kind::left_paren, start, line, column);
-        break;
-
+        return make_token(token_kind::left_paren, start, line, column);
     case ')':
-        emit(tokens, token_kind::right_paren, start, line, column);
-        break;
-
+        return make_token(token_kind::right_paren, start, line, column);
     case '{':
-        emit(tokens, token_kind::left_brace, start, line, column);
-        break;
-
+        return make_token(token_kind::left_brace, start, line, column);
     case '}':
-        emit(tokens, token_kind::right_brace, start, line, column);
-        break;
-
-    case ',':
-        emit(tokens, token_kind::comma, start, line, column);
-        break;
-
-    case ';':
-        emit(tokens, token_kind::semicolon, start, line, column);
-        break;
-
-    case ':':
-        emit(tokens, token_kind::colon, start, line, column);
-        break;
-    case '%':
-        emit(tokens, token_kind::modulo, start, line, column);
-        break;
-    case '^':
-        emit(tokens, token_kind::caret, start, line, column);
-        break;
-    case '~':
-        emit(tokens, token_kind::tilde, start, line, column);
-        break;
-    case '.':
-        emit(tokens, token_kind::dot, start, line, column);
-        break;
+        return make_token(token_kind::right_brace, start, line, column);
     case '[':
-        emit(tokens, token_kind::left_bracket, start, line, column);
-        break;
+        return make_token(token_kind::left_bracket, start, line, column);
     case ']':
-        emit(tokens, token_kind::right_bracket, start, line, column);
-        break;
+        return make_token(token_kind::right_bracket, start, line, column);
+    case ',':
+        return make_token(token_kind::comma, start, line, column);
+    case ';':
+        return make_token(token_kind::semicolon, start, line, column);
+    case ':':
+        return make_token(token_kind::colon, start, line, column);
+    case '.':
+        return make_token(token_kind::dot, start, line, column);
+    case '%':
+        return make_token(token_kind::modulo, start, line, column);
+    case '^':
+        return make_token(token_kind::caret, start, line, column);
+    case '~':
+        return make_token(token_kind::tilde, start, line, column);
     case '|':
-        if (match('|')) {
-            emit(tokens, token_kind::logical_or, start, line, column);
-        }
-        else {
-            emit(tokens, token_kind::pipe, start, line, column);
-        }
-        break;
+        return make_token(match('|') ? token_kind::logical_or : token_kind::pipe, start, line,
+                          column);
     case '&':
-        if (match('&')) {
-            emit(tokens, token_kind::logical_and, start, line, column);
-        }
-        else {
-            emit(tokens, token_kind::ampersand, start, line, column);
-        }
-        break;
-
+        return make_token(match('&') ? token_kind::logical_and : token_kind::ampersand, start, line,
+                          column);
     default:
-        // temporary, it should continue lexing
-        // with a diagnostic
-        // in the future, we should do this:
-        // main.az:2:11: error: Unexpected character '@'.
-        //
-        // 2 |     var x = 5 @ 10;
-        //   |               ^
-        m_diagnostics.report({.severity = diagnostic_severity::error,
-                              .message = fmt::format("{}:{}:{}: Unexpected character '{}'.",
-                                                     m_filename, line, column, c)});
+        m_diagnostics.report(
+            {diagnostic_severity::error,
+             fmt::format("{}:{}:{}: Unexpected character '{}'.", m_filename, line, column, c)});
+        return std::nullopt;
     }
 }
 
-auto lexer::identifier(std::vector<token> &tokens) -> void {
+auto lexer::identifier() -> token {
     auto const start = m_position;
     auto const line = m_line;
     auto const column = m_column;
@@ -313,15 +214,10 @@ auto lexer::identifier(std::vector<token> &tokens) -> void {
     }
 
     std::string_view const text = m_source.substr(start, m_position - start);
-
-    tokens.push_back(token{.kind = identifier_kind(text),
-                           .lexeme = text,
-                           .offset = start,
-                           .line = line,
-                           .column = column});
+    return make_token(identifier_kind(text), start, line, column);
 }
 
-auto lexer::number(std::vector<token> &tokens) -> void {
+auto lexer::number() -> token {
     auto const start = m_position;
     auto const line = m_line;
     auto const column = m_column;
@@ -331,102 +227,75 @@ auto lexer::number(std::vector<token> &tokens) -> void {
     }
 
     token_kind kind = token_kind::integer_literal;
-
     if (peek() == '.' && std::isdigit(static_cast<unsigned char>(peek_next()))) {
         kind = token_kind::float_literal;
-
         advance(); // consume '.'
-
         while (std::isdigit(static_cast<unsigned char>(peek()))) {
             advance();
         }
     }
-
-    std::string_view const text = m_source.substr(start, m_position - start);
-
-    tokens.push_back(
-        token{.kind = kind, .lexeme = text, .offset = start, .line = line, .column = column});
+    return make_token(kind, start, line, column);
 }
 
-auto lexer::character(std::vector<token> &tokens) -> void {
+auto lexer::character() -> std::optional<token> {
     auto const start = m_position;
     auto const line = m_line;
     auto const column = m_column;
 
     advance(); // opening '
-
     if (is_at_end()) {
-        m_diagnostics.report({.severity = diagnostic_severity::error,
-                              .message = fmt::format("{}:{}:{}: Unterminated character literal.",
-                                                     m_filename, line, column)});
-
-        return;
+        m_diagnostics.report(
+            {diagnostic_severity::error,
+             fmt::format("{}:{}:{}: Unterminated character literal.", m_filename, line, column)});
+        return std::nullopt;
     }
 
     advance(); // character
-
     if (peek() != '\'') {
-        m_diagnostics.report({.severity = diagnostic_severity::error,
-                              .message = fmt::format(
-                                  "{}:{}:{}: Character literal must contain exactly one character.",
-                                  m_filename, line, column)});
-
+        m_diagnostics.report(
+            {diagnostic_severity::error,
+             fmt::format("{}:{}:{}: Character literal must contain exactly one character.",
+                         m_filename, line, column)});
         recover_to('\'');
-        return;
+        return std::nullopt;
     }
 
     advance(); // closing '
-
-    std::string_view const text = m_source.substr(start, m_position - start);
-
-    tokens.push_back(token{.kind = token_kind::character_literal,
-                           .lexeme = text,
-                           .offset = start,
-                           .line = line,
-                           .column = column});
+    return make_token(token_kind::character_literal, start, line, column);
 }
 
-auto lexer::string(std::vector<token> &tokens) -> void {
+auto lexer::string() -> std::optional<token> {
     auto const start = m_position;
     auto const line = m_line;
     auto const column = m_column;
 
     advance(); // opening "
-
     while (!is_at_end() && peek() != '"' && peek() != '\n') {
         advance();
     }
 
     if (is_at_end()) {
-        m_diagnostics.report({.severity = diagnostic_severity::error,
-                              .message = fmt::format("{}:{}:{}: Unterminated string literal.",
-                                                     m_filename, line, column)});
-
+        m_diagnostics.report(
+            {diagnostic_severity::error,
+             fmt::format("{}:{}:{}: Unterminated string literal.", m_filename, line, column)});
         recover_to('"');
-        return;
+        return std::nullopt;
     }
 
     advance(); // closing "
-
-    std::string_view const text = m_source.substr(start, m_position - start);
-
-    tokens.push_back(token{.kind = token_kind::string_literal,
-                           .lexeme = text,
-                           .offset = start,
-                           .line = line,
-                           .column = column});
+    return make_token(token_kind::string_literal, start, line, column);
 }
 
-auto lexer::make_token(token_kind kind, std::size_t start, std::size_t line,
-                       std::size_t column) const -> token {
+auto lexer::make_token(token_kind const kind, std::uint32_t const start, std::uint32_t const line,
+                       std::uint32_t const column) const -> token {
     return {.kind = kind,
-            .lexeme = m_source.substr(start, m_position - start),
+            .length = m_position - start,
             .offset = start,
             .line = line,
             .column = column};
 }
 
-auto lexer::identifier_kind(std::string_view lexeme) noexcept -> token_kind {
+auto lexer::identifier_kind(std::string_view const lexeme) noexcept -> token_kind {
     if (lexeme == "fn") {
         return token_kind::kw_fn;
     }
@@ -451,7 +320,6 @@ auto lexer::identifier_kind(std::string_view lexeme) noexcept -> token_kind {
     if (lexeme == "string") {
         return token_kind::kw_string;
     }
-
     return token_kind::identifier;
 }
 
