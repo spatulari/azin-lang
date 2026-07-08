@@ -19,14 +19,14 @@ namespace source {
  * utilities for reading characters, peeking ahead, tracking the
  * current position, and retrieving metadata about the source.
  */
-class Manager {
+class manager {
 public:
     /**
      * @brief Constructs a source manager.
      *
      * @param path Path to the source file.
      */
-    explicit Manager(std::filesystem::path path);
+    explicit manager(std::filesystem::path path);
 
     /**
      * @brief Loads the source file into memory.
@@ -102,7 +102,7 @@ public:
      * @return Constant reference to the source path.
      */
     [[nodiscard]]
-    auto path() const noexcept -> const std::filesystem::path&;
+    auto path() const noexcept -> std::filesystem::path const &;
 
     /**
      * @brief Returns the source file name.

@@ -1,12 +1,13 @@
-#include <CLI/CLI.hpp>
-#include <azc/cli.hpp>
-#include <azin/source.hpp>
-#include <cstdio> // NOLINT
-#include <filesystem>
-#include <azin/lexer.hpp>
-#include <azin/token.hpp>
 #include <azin/diagnostic.hpp>
 #include <azin/diagnostic_engine.hpp>
+#include <azin/lexer.hpp>
+#include <azin/source.hpp>
+#include <azin/token.hpp>
+
+#include <CLI/CLI.hpp>
+#include <azc/cli.hpp>
+#include <cstdio> // NOLINT
+#include <filesystem>
 
 // Disable the unreachable code warning for MSVC
 #if defined(_MSC_VER) && !defined(__llvm__)
@@ -39,19 +40,14 @@ void errprintln(std::string_view const msg) {
 }
 
 auto print_token_stream(std::span<azc::frontend::token const> tokens) -> void {
-    for (const auto& token : tokens) {
-        fmt::println(
-            "{} \"{}\" ({}:{})",
-            azc::frontend::token_kind_to_string(token.kind),
-            token.lexeme,
-            token.line,
-            token.column
-        );
+    for (auto const &token : tokens) {
+        fmt::println("{} \"{}\" ({}:{})", azc::frontend::token_kind_to_string(token.kind),
+                     token.lexeme, token.line, token.column);
     }
 }
 
 auto print_diagnostics(std::span<azc::frontend::diagnostic const> diagnostics) -> void {
-    for (auto const& diagnostic : diagnostics) {
+    for (auto const &diagnostic : diagnostics) {
         errorf("{}", diagnostic.message);
     }
 }
@@ -81,7 +77,7 @@ auto cli::run(int const argc, char const *const *argv) -> int {
         return 1;
     }
 
-    source::Manager source{input};
+    source::manager source{input};
 
     if (!source.load()) {
         errorf("failed to open '{}'", input.string());
