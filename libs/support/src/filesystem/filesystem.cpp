@@ -1,47 +1,53 @@
 #include <azin/support/fs/filesystem.hpp>
 
-#include <fstream>
-#include <ios>
-#include <iterator>
+#include <cppcoro/io_service.hpp>
+#include <cppcoro/read_only_file.hpp>
+#include <cppcoro/task.hpp>
+#include <expected>
+#include <filesystem>
+#include <string>
 
 namespace azin::support::fs {
 
 namespace {
-
-constexpr auto source_extension = ".az";
+constexpr std::string_view source_extension = ".az";
 
 [[nodiscard]]
 auto validate_source_file(std::filesystem::path const &source_path) -> Result {
-    if (!std::filesystem::is_regular_file(source_path)) {
-        return std::unexpected(FileError{"Source file does not exist: " + source_path.string()});
+    std::error_code ec;
+
+    if (!std::filesystem::is_regular_file(source_path, ec)) {
+        return std::unexpected(FileError{"Source file does not exist or is not a regular file: " +
+                                         source_path.string()});
     }
 
     if (source_path.extension() != source_extension) {
-        return std::unexpected(
-            FileError{"Invalid source file extension: " + source_path.extension().string()});
+        return std::unexpected(FileError{"Unsupported source file extension '" +
+                                         source_path.extension().string() + "' (expected .az)."});
     }
 
     return {};
 }
-
 } // namespace
 
-auto read_source_file(std::filesystem::path const &source_path) -> FileResult {
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-reference-coroutine-parameters)
+auto read_source_file_async(cppcoro::io_service &io_service,
+                            std::filesystem::path const source_path) -> FileTask {
     if (auto result = validate_source_file(source_path); !result) {
-        return std::unexpected(result.error());
+        co_return std::unexpected(result.error());
     }
 
-    std::ifstream file(source_path, std::ios::binary);
+    auto const file = cppcoro::read_only_file::open(io_service, source_path);
 
-    if (!file) {
-        return std::unexpected(FileError{"Failed to open source file: " + source_path.string()});
+    std::string buffer(file.size(), '\0');
+
+    std::size_t const bytes_read = co_await file.read(0, buffer.data(), buffer.size());
+    if (bytes_read != buffer.size()) {
+        co_return std::unexpected(
+            FileError{"Unexpected end of file while reading '" + source_path.string() + "'."});
     }
 
-    // Read the entire file into a string
-    std::string buffer;
-    buffer.assign(std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{});
-
-    return buffer;
+    co_return buffer;
 }
 
 } // namespace azin::support::fs

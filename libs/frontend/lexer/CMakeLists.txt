@@ -16,6 +16,7 @@ target_link_libraries(frontend_lexer
                       Azin::CompilerFlags
                       Azin::Frontend::Token
                       Azin::Frontend::Diagnostic
+                      cppcoro
                       fmt::fmt
 )
 

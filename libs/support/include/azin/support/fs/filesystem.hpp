@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <cppcoro/io_service.hpp>
+#include <cppcoro/task.hpp>
 #include <expected>
 #include <filesystem>
 #include <fstream>
@@ -30,16 +32,13 @@ struct FileError {
  */
 using Result = std::expected<void, FileError>;
 
-/**
- * @brief Result of reading a source file.
- * Contains the full source string on success.
- */
-using FileResult = std::expected<std::string, FileError>;
+using FileTask = cppcoro::task<std::expected<std::string, FileError>>;
 
 /**
  * @brief Reads an Azin source file entirely into memory.
  */
 [[nodiscard]]
-auto read_source_file(std::filesystem::path const &source_path) -> FileResult;
+auto read_source_file_async(cppcoro::io_service &io_service,
+                            std::filesystem::path const source_path) -> FileTask;
 
 } // namespace azin::support::fs

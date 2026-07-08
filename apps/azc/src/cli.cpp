@@ -8,57 +8,114 @@
 
 #include <CLI/CLI.hpp>
 #include <azc/cli.hpp>
-#include <cstdio> // NOLINT
+#include <cppcoro/io_service.hpp>
+#include <cppcoro/sync_wait.hpp>
+#include <cppcoro/task.hpp>
+#include <cppcoro/when_all_ready.hpp>
 #include <filesystem>
-
-// Disable the unreachable code warning for MSVC
-#if defined(_MSC_VER) && !defined(__llvm__)
-    #pragma warning(push)
-    #pragma warning(disable : 4702)
-#endif
-
 #include <fmt/base.h>
 #include <fmt/color.h>
 #include <span>
-
-#if defined(_MSC_VER) && !defined(__llvm__)
-    #pragma warning(pop)
-#endif
-
 #include <string_view>
+#include <utility>
 
 namespace cli = azc::cli;
+namespace frontend = azc::frontend;
+namespace fs = azin::support::fs;
 
 namespace {
 
 template <typename... Args>
-void errorf(fmt::format_string<Args...> fmt_str, Args &&...args) {
-    fmt::print(stderr, fg(fmt::color::red), fmt_str, std::forward<Args>(args)...);
+auto errorf(frontend::diagnostic_severity const severity, fmt::format_string<Args...> fmt,
+            Args &&...args) -> void {
+    fmt::color foreground = fmt::color::white;
+    switch (severity) {
+    case frontend::diagnostic_severity::error: {
+        foreground = fmt::color::red;
+    } break;
+    case frontend::diagnostic_severity::warning: {
+        foreground = fmt::color::yellow;
+    } break;
+    default:
+        break;
+    }
+    fmt::print(stderr, fg(foreground), fmt, std::forward<Args>(args)...);
     fmt::print(stderr, "\n");
 }
 
-void errprintln(std::string_view const msg) {
-    fmt::print(stderr, fg(fmt::color::red), "error: {}\n", msg);
+auto print_diagnostics(std::span<frontend::diagnostic const> diagnostics) -> void {
+    for (auto const &[severity, message] : diagnostics) {
+        errorf(severity, "{}", message);
+    }
 }
 
-auto print_diagnostics(std::span<azc::frontend::diagnostic const> diagnostics) -> void {
-    for (auto const &[_, message] : diagnostics) {
-        errorf("{}", message);
+auto process_events(cppcoro::io_service &io) -> cppcoro::task<> {
+    io.process_events();
+    co_return;
+}
+
+template <typename T>
+auto run_task(cppcoro::task<T> task, cppcoro::io_service &io) -> T {
+    auto wrapped_task = [](cppcoro::task<T> t, cppcoro::io_service &io_ref) -> cppcoro::task<T> {
+        try {
+            auto res = co_await t;
+            io_ref.stop();
+            co_return res;
+        }
+        catch (...) {
+            io_ref.stop();
+            throw;
+        }
+    }(std::move(task), io);
+
+    auto [result, _] =
+        cppcoro::sync_wait(cppcoro::when_all_ready(std::move(wrapped_task), process_events(io)));
+
+    return result.result();
+}
+
+auto lex_file(cppcoro::io_service &io, std::filesystem::path input, bool printTokens)
+    -> cppcoro::task<int> {
+    auto file = co_await fs::read_source_file_async(io, std::move(input));
+
+    if (!file) {
+        errorf(frontend::diagnostic_severity::error, "{}", file.error().message);
+        co_return 1;
     }
+
+    source::manager source{std::move(*file), input};
+
+    frontend::diagnostic_engine diagnostics;
+    frontend::lexer lexer{source.text(), source.file_name(), diagnostics};
+
+    print_diagnostics(diagnostics.diagnostics());
+
+    if (printTokens) {
+        for (auto const &token : lexer.tokens()) {
+            fmt::println("{} \"{}\" ({}:{})", frontend::token_kind_to_string(token.kind),
+                         lexer.get_lexeme(token), token.line, token.column);
+
+            if (token.kind == frontend::token_kind::eof) {
+                break;
+            }
+        }
+    }
+
+    co_return diagnostics.has_errors() ? 1 : 0;
 }
 
 } // namespace
 
-auto cli::run(int const argc, char const *const *argv) -> int {
+auto cli::run(int argc, char const *const *argv) -> int {
     CLI::App app{"Azin Compiler"};
 
-    bool version{false};
-    bool print_tokens{false};
+    bool version = false;
+    bool printTokens = false;
     std::filesystem::path input;
 
-    app.add_flag("--version", version, "Display the compiler's version");
+    app.add_flag("--version", version, "Display the compiler version");
+    app.add_flag("--print-tokens", printTokens, "Print the generated tokens");
     app.add_option("input", input, "Source file to compile");
-    app.add_flag("--print-tokens", print_tokens, "Print the tokens");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -68,33 +125,11 @@ auto cli::run(int const argc, char const *const *argv) -> int {
     }
 
     if (input.empty()) {
-        errprintln("no input file specified\nUsage: azc <source>");
+        errorf(frontend::diagnostic_severity::error,
+               "no input file specified\nUsage: azc <source>");
         return 1;
     }
 
-    auto file_result = azin::support::fs::read_source_file(input);
-    if (!file_result) {
-        errorf("{}", file_result.error().message);
-        return 1;
-    }
-
-    source::manager source{std::move(*file_result), input};
-    fmt::println("Loaded {} bytes", source.text().size());
-
-    frontend::diagnostic_engine diagnostics;
-    frontend::lexer lexer{source.text(), source.file_name(), diagnostics};
-
-    if (print_tokens) {
-        frontend::token t;
-        do {
-            t = lexer.next_token();
-            fmt::println("{} \"{}\" ({}:{})", azc::frontend::token_kind_to_string(t.kind),
-                         lexer.get_lexeme(t), t.line, t.column);
-        }
-        while (t.kind != frontend::token_kind::eof);
-    }
-
-    print_diagnostics(diagnostics.diagnostics());
-
-    return diagnostics.has_errors() ? 1 : 0;
+    cppcoro::io_service io;
+    return run_task(lex_file(io, std::move(input), printTokens), io);
 }
