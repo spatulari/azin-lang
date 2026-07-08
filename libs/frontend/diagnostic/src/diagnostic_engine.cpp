@@ -9,9 +9,8 @@ void diagnostic_engine::report(diagnostic diagnostic) {
 }
 
 auto diagnostic_engine::has_errors() const noexcept -> bool {
-    for (auto const& diagnostic : m_diagnostics) {
-        if (diagnostic.severity ==
-        diagnostic_severity::error) {
+    for (auto const &diagnostic : m_diagnostics) {
+        if (diagnostic.severity == diagnostic_severity::error) {
             return true;
         }
     }
@@ -19,9 +18,8 @@ auto diagnostic_engine::has_errors() const noexcept -> bool {
     return false;
 }
 
-auto diagnostic_engine::diagnostics() const noexcept -> std::span<const diagnostic> {
-
+auto diagnostic_engine::diagnostics() const noexcept -> std::span<diagnostic const> {
     return m_diagnostics;
 }
 
-}
+} // namespace azc::frontend
