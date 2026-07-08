@@ -4,22 +4,12 @@
 
 namespace azc::frontend {
 
-void diagnostic_engine::report(diagnostic diagnostic) {
-    m_diagnostics.push_back(std::move(diagnostic));
-}
-
-auto diagnostic_engine::has_errors() const noexcept -> bool {
-    for (auto const &diagnostic : m_diagnostics) {
-        if (diagnostic.severity == diagnostic_severity::error) {
-            return true;
-        }
+void diagnostic_engine::report(diagnostic const &diag) {
+    if (diag.severity == diagnostic_severity::error) {
+        m_has_errors = true;
     }
 
-    return false;
-}
-
-auto diagnostic_engine::diagnostics() const noexcept -> std::span<diagnostic const> {
-    return m_diagnostics;
+    m_diagnostics.push_back(std::move(diag));
 }
 
 } // namespace azc::frontend

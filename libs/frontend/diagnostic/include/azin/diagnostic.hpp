@@ -26,9 +26,6 @@ enum class diagnostic_severity : std::uint8_t {
 
 /**
  * @brief Represents a compiler diagnostic.
- *
- * A diagnostic consists of a severity level and a human-readable
- * message describing the issue.
  */
 struct diagnostic {
     /// Severity of the diagnostic.

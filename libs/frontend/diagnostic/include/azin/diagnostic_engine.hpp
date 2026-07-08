@@ -14,41 +14,36 @@ namespace azc::frontend {
 
 /**
  * @brief Collects and manages compiler diagnostics.
- *
- * The diagnostic engine stores diagnostics reported by the frontend
- * and provides utilities for querying them after compilation.
  */
 class diagnostic_engine {
 public:
     /**
      * @brief Reports a diagnostic.
-     *
-     * The diagnostic is appended to the internal collection.
-     *
-     * @param diagnostic Diagnostic to report.
+     * @param diag Diagnostic to report.
      */
-    void report(diagnostic diagnostic);
+    void report(diagnostic const &diag);
 
     /**
      * @brief Returns whether any reported diagnostic is an error.
-     *
-     * @return true if at least one error diagnostic exists.
-     * @return false otherwise.
      */
     [[nodiscard]]
-    auto has_errors() const noexcept -> bool;
+    auto has_errors() const noexcept -> bool {
+        return m_has_errors;
+    }
 
     /**
      * @brief Returns all reported diagnostics.
-     *
-     * @return Read-only view of the stored diagnostics.
      */
     [[nodiscard]]
-    auto diagnostics() const noexcept -> std::span<diagnostic const>;
+    auto diagnostics() const noexcept -> std::span<diagnostic const> {
+        return m_diagnostics;
+    }
 
 private:
-    /// Collection of reported diagnostics.
     std::vector<diagnostic> m_diagnostics;
+
+    /// O(1) cache to track if any errors have been reported.
+    bool m_has_errors = false;
 };
 
 } // namespace azc::frontend
