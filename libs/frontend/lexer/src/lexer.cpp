@@ -151,19 +151,33 @@ auto lexer::scan_token(std::vector<token>& tokens) -> void {
     switch (c) {
         // it doesn't support escape characters like '\n' (yet)
         case '+':
-            emit(tokens, token_kind::plus, start, line, column);
+            if (match('=')) {
+                emit(tokens, token_kind::plus_equal, start, line, column);
+            } else if (match('+')) {
+                emit(tokens, token_kind::plus_plus, start, line, column);
+            } else {
+                emit(tokens, token_kind::plus, start, line, column);
+            }
             break;
 
         case '-':
             if (match('>')) {
                 emit(tokens, token_kind::arrow, start, line, column);
+            } else if (match('=')) {
+                emit(tokens, token_kind::minus_equal, start, line, column);
+            } else if (match('-')) {
+                emit(tokens, token_kind::minus_minus, start, line, column);
             } else {
                 emit(tokens, token_kind::minus, start, line, column);
             }
             break;
 
         case '*':
-            emit(tokens, token_kind::star, start, line, column);
+            if (match('=')) {
+                emit(tokens, token_kind::star_equal, start, line, column);
+            } else {
+                emit(tokens, token_kind::star, start, line, column);
+            }
             break;
 
         case '/':
@@ -195,6 +209,8 @@ auto lexer::scan_token(std::vector<token>& tokens) -> void {
 
                     return;
                 }
+            } else if (match('=')) {
+                emit(tokens, token_kind::slash_equal, start, line, column);
             } else {
                 emit(tokens, token_kind::slash, start, line, column);
             }
@@ -219,6 +235,8 @@ auto lexer::scan_token(std::vector<token>& tokens) -> void {
         case '<':
             if (match('=')) {
                 emit(tokens, token_kind::less_equal, start, line, column);
+            } else if (match('<')) {
+                emit(tokens, token_kind::less_less, start, line, column);
             } else {
                 emit(tokens, token_kind::less, start, line, column);
             }
@@ -227,6 +245,8 @@ auto lexer::scan_token(std::vector<token>& tokens) -> void {
         case '>':
             if (match('=')) {
                 emit(tokens, token_kind::greater_equal, start, line, column);
+            } else if (match('>')) {
+                emit(tokens, token_kind::greater_greater, start, line, column);
             } else {
                 emit(tokens, token_kind::greater, start, line, column);
             }
@@ -260,10 +280,18 @@ auto lexer::scan_token(std::vector<token>& tokens) -> void {
             emit(tokens, token_kind::colon, start, line, column);
             break;
         case '%':
-            emit(tokens, token_kind::modulo, start, line, column);
+            if (match('=')) {
+                emit(tokens, token_kind::modulo_equal, start, line, column);
+            } else {
+                emit(tokens, token_kind::modulo, start, line, column);
+            }
             break;
         case '^':
-            emit(tokens, token_kind::caret, start, line, column);
+            if (match('=')) {
+                emit(tokens, token_kind::caret_equal, start, line, column);
+            } else {
+                emit(tokens, token_kind::caret, start, line, column);
+            }
             break;
         case '~':
             emit(tokens, token_kind::tilde, start, line, column);
@@ -280,6 +308,8 @@ auto lexer::scan_token(std::vector<token>& tokens) -> void {
         case '|':
             if (match('|')) {
                 emit(tokens, token_kind::logical_or, start, line, column);
+            } else if (match('=')) {
+                emit(tokens, token_kind::pipe_equal, start, line, column);
             } else {
                 emit(tokens, token_kind::pipe, start, line, column);
             }
@@ -287,11 +317,13 @@ auto lexer::scan_token(std::vector<token>& tokens) -> void {
         case '&':
             if (match('&')) {
                 emit(tokens, token_kind::logical_and, start, line, column);
+            } else if (match('=')) {
+                emit(tokens, token_kind::ampersand_equal, start, line, column);
             } else {
                 emit(tokens, token_kind::ampersand, start, line, column);
             }
             break;
-        
+                
         default:
             // temporary, it should continue lexing
             // with a diagnostic

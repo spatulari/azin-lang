@@ -57,6 +57,18 @@ namespace azc::frontend {
         ampersand,
         caret, // ^, bitwise XOR
         tilde, // ~, bitwise NOT
+        plus_equal,      // +=
+        minus_equal,     // -=
+        star_equal,      // *=
+        slash_equal,     // /=
+        modulo_equal,    // %=
+        caret_equal,     // ^=
+        pipe_equal,      // |=
+        ampersand_equal, // &=
+        plus_plus,       // ++
+        minus_minus,     // --
+        less_less,       // <<
+        greater_greater, // >>
 
         // Delimiters
         left_paren,
@@ -123,6 +135,18 @@ namespace azc::frontend {
             case token_kind::tilde:            return "tilde";
             case token_kind::logical_or:       return "logical_or";
             case token_kind::logical_and:      return "logical_and";
+            case token_kind::plus_equal:       return "plus_equal";
+            case token_kind::minus_equal:      return "minus_equal";
+            case token_kind::star_equal:       return "star_equal";
+            case token_kind::slash_equal:      return "slash_equal";
+            case token_kind::modulo_equal:     return "modulo_equal";
+            case token_kind::caret_equal:      return "caret_equal";
+            case token_kind::pipe_equal:       return "pipe_equal";
+            case token_kind::ampersand_equal:  return "ampersand_equal";
+            case token_kind::plus_plus:        return "plus_plus";
+            case token_kind::minus_minus:      return "minus_minus";
+            case token_kind::less_less:        return "less_less";
+            case token_kind::greater_greater:  return "greater_greater";
 
             // Delimiters
             case token_kind::left_paren:       return "left_paren";
