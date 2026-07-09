@@ -8,10 +8,6 @@
 
 #include <CLI/CLI.hpp>
 #include <azc/cli.hpp>
-#include <cppcoro/io_service.hpp>
-#include <cppcoro/sync_wait.hpp>
-#include <cppcoro/task.hpp>
-#include <cppcoro/when_all_ready.hpp>
 #include <filesystem>
 #include <fmt/base.h>
 #include <fmt/color.h>
@@ -28,15 +24,15 @@ namespace {
 template <typename... Args>
 auto errorf(frontend::diagnostic_severity const severity, fmt::format_string<Args...> fmt,
             Args &&...args) -> void {
-    fmt::color foreground = fmt::color::white;
+    auto foreground = fmt::color::white;
     switch (severity) {
-    case frontend::diagnostic_severity::error: {
+    case frontend::diagnostic_severity::error:
         foreground = fmt::color::red;
-    } break;
-    case frontend::diagnostic_severity::warning: {
+        break;
+    case frontend::diagnostic_severity::warning:
         foreground = fmt::color::yellow;
-    } break;
-    default:
+        break;
+    case frontend::diagnostic_severity::note:
         break;
     }
     fmt::print(stderr, fg(foreground), fmt, std::forward<Args>(args)...);
@@ -49,38 +45,12 @@ auto print_diagnostics(std::span<frontend::diagnostic const> diagnostics) -> voi
     }
 }
 
-auto process_events(cppcoro::io_service &io) -> cppcoro::task<> {
-    io.process_events();
-    co_return;
-}
-
-template <typename T>
-auto run_task(cppcoro::task<T> task, cppcoro::io_service &io) -> T {
-    auto wrapped_task = [](cppcoro::task<T> t, cppcoro::io_service &io_ref) -> cppcoro::task<T> {
-        try {
-            auto res = co_await t;
-            io_ref.stop();
-            co_return res;
-        }
-        catch (...) {
-            io_ref.stop();
-            throw;
-        }
-    }(std::move(task), io);
-
-    auto [result, _] =
-        cppcoro::sync_wait(cppcoro::when_all_ready(std::move(wrapped_task), process_events(io)));
-
-    return result.result();
-}
-
-auto lex_file(cppcoro::io_service &io, std::filesystem::path input, bool printTokens)
-    -> cppcoro::task<int> {
-    auto file = co_await fs::read_source_file_async(io, std::move(input));
+auto lex_file(std::filesystem::path input, bool printTokens) -> int {
+    auto file = fs::read_source_file(std::move(input));
 
     if (!file) {
         errorf(frontend::diagnostic_severity::error, "{}", file.error().message);
-        co_return 1;
+        return 1;
     }
 
     source::manager source{std::move(*file), input};
@@ -101,7 +71,7 @@ auto lex_file(cppcoro::io_service &io, std::filesystem::path input, bool printTo
         }
     }
 
-    co_return diagnostics.has_errors() ? 1 : 0;
+    return diagnostics.has_errors() ? 1 : 0;
 }
 
 } // namespace
@@ -130,6 +100,5 @@ auto cli::run(int argc, char const *const *argv) -> int {
         return 1;
     }
 
-    cppcoro::io_service io;
-    return run_task(lex_file(io, std::move(input), printTokens), io);
+    return lex_file(std::move(input), printTokens);
 }

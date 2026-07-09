@@ -14,8 +14,7 @@ target_include_directories(support_filesystem PUBLIC
 
 target_link_libraries(support_filesystem
         PRIVATE
-        Azin::CompilerFlags
-        cppcoro)
+        Azin::CompilerFlags)
 azin_enable_analyzers(support_filesystem)
 
 #-------------------------------------------------------------------------------

@@ -1,12 +1,13 @@
 #include <azin/lexer.hpp>
 
 #include <algorithm>
-#include <cctype>
+#include <cppcoro/generator.hpp>
 #include <utility>
 
 namespace azc::frontend {
 
-lexer::lexer(std::string_view source, std::string_view filename, diagnostic_engine &diagnostics)
+lexer::lexer(std::string_view const source, std::string_view const filename,
+             diagnostic_engine &diagnostics)
     : m_source(source)
     , m_filename(filename)
     , m_diagnostics(diagnostics) {

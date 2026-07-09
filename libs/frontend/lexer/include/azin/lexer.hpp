@@ -4,7 +4,6 @@
 #include <azin/token.hpp>
 
 #include <cppcoro/generator.hpp>
-#include <cstdint>
 #include <fmt/format.h>
 #include <optional>
 #include <string_view>

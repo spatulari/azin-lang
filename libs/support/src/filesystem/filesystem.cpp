@@ -1,10 +1,8 @@
 #include <azin/support/fs/filesystem.hpp>
 
-#include <cppcoro/io_service.hpp>
-#include <cppcoro/read_only_file.hpp>
-#include <cppcoro/task.hpp>
 #include <expected>
 #include <filesystem>
+#include <fstream>
 #include <string>
 
 namespace azin::support::fs {
@@ -13,7 +11,8 @@ namespace {
 constexpr std::string_view source_extension = ".az";
 
 [[nodiscard]]
-auto validate_source_file(std::filesystem::path const &source_path) -> Result {
+auto validate_source_file(std::filesystem::path const &source_path)
+    -> std::expected<void, FileError> {
     std::error_code ec;
 
     if (!std::filesystem::is_regular_file(source_path, ec)) {
@@ -30,24 +29,28 @@ auto validate_source_file(std::filesystem::path const &source_path) -> Result {
 }
 } // namespace
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-reference-coroutine-parameters)
-auto read_source_file_async(cppcoro::io_service &io_service,
-                            std::filesystem::path const source_path) -> FileTask {
+auto read_source_file(std::filesystem::path const &source_path)
+    -> std::expected<std::string, FileError> {
     if (auto result = validate_source_file(source_path); !result) {
-        co_return std::unexpected(result.error());
+        return std::unexpected(result.error());
     }
 
-    auto const file = cppcoro::read_only_file::open(io_service, source_path);
-
-    std::string buffer(file.size(), '\0');
-
-    std::size_t const bytes_read = co_await file.read(0, buffer.data(), buffer.size());
-    if (bytes_read != buffer.size()) {
-        co_return std::unexpected(
-            FileError{"Unexpected end of file while reading '" + source_path.string() + "'."});
+    std::ifstream file(source_path, std::ios::binary);
+    if (!file) {
+        return std::unexpected(FileError{"Failed to open '" + source_path.string() + "'."});
     }
 
-    co_return buffer;
+    file.seekg(0, std::ios::end);
+    std::size_t size = static_cast<std::size_t>(file.tellg());
+    file.seekg(0, std::ios::beg);
+
+    std::string buffer(size, '\0');
+
+    if (!file.read(buffer.data(), static_cast<std::streamsize>(size))) {
+        return std::unexpected(FileError{"Failed to read '" + source_path.string() + "'."});
+    }
+
+    return buffer;
 }
 
 } // namespace azin::support::fs
