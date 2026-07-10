@@ -1,3 +1,6 @@
+#include <cctype>
+#include <unordered_map>
+#include <azin/token.hpp>
 #include <azin/lexer.hpp>
 
 #include <algorithm>
@@ -208,10 +211,28 @@ auto lexer::scan_string(token_start start) -> std::optional<token> {
 auto lexer::scan_operator(char c, token_start start) -> std::optional<token> {
     switch (c) {
     case '+':
+        if (match('=')) {
+            return make_token(token_kind::plus_equal, start);
+        }
+        if (match('+')) {
+            return make_token(token_kind::plus_plus, start);
+        }
         return make_token(token_kind::plus, start);
 
     case '-':
-        return make_token(match('>') ? token_kind::arrow : token_kind::minus, start);
+        if (match('>')) {
+            return make_token(token_kind::arrow, start);
+        }
+        if (match('=')) {
+            return make_token(token_kind::minus_equal, start);
+        }
+        if (match('-')) {
+            return make_token(token_kind::minus_minus, start);
+        }
+        return make_token(token_kind::minus, start);
+
+    case '*':
+        return make_token(match('=') ? token_kind::star_equal : token_kind::star, start);
 
     case '=':
         return make_token(match('=') ? token_kind::equal_equal : token_kind::equal, start);
@@ -220,16 +241,40 @@ auto lexer::scan_operator(char c, token_start start) -> std::optional<token> {
         return make_token(match('=') ? token_kind::bang_equal : token_kind::bang, start);
 
     case '<':
-        return make_token(match('=') ? token_kind::less_equal : token_kind::less, start);
+        if (match('=')) {
+            return make_token(token_kind::less_equal, start);
+        }
+        if (match('<')) {
+            return make_token(token_kind::less_less, start);
+        }
+        return make_token(token_kind::less, start);
 
     case '>':
-        return make_token(match('=') ? token_kind::greater_equal : token_kind::greater, start);
+        if (match('=')) {
+            return make_token(token_kind::greater_equal, start);
+        }
+        if (match('>')) {
+            return make_token(token_kind::greater_greater, start);
+        }
+        return make_token(token_kind::greater, start);
 
     case '|':
-        return make_token(match('|') ? token_kind::logical_or : token_kind::pipe, start);
+        if (match('|')) {
+            return make_token(token_kind::logical_or, start);
+        }
+        if (match('=')) {
+            return make_token(token_kind::pipe_equal, start);
+        }
+        return make_token(token_kind::pipe, start);
 
     case '&':
-        return make_token(match('&') ? token_kind::logical_and : token_kind::ampersand, start);
+        if (match('&')) {
+            return make_token(token_kind::logical_and, start);
+        }
+        if (match('=')) {
+            return make_token(token_kind::ampersand_equal, start);
+        }
+        return make_token(token_kind::ampersand, start);
 
     case '(':
         return make_token(token_kind::left_paren, start);
@@ -262,10 +307,10 @@ auto lexer::scan_operator(char c, token_start start) -> std::optional<token> {
         return make_token(token_kind::dot, start);
 
     case '%':
-        return make_token(token_kind::modulo, start);
+        return make_token(match('=') ? token_kind::modulo_equal : token_kind::modulo, start);
 
     case '^':
-        return make_token(token_kind::caret, start);
+        return make_token(match('=') ? token_kind::caret_equal : token_kind::caret, start);
 
     case '~':
         return make_token(token_kind::tilde, start);
@@ -275,7 +320,7 @@ auto lexer::scan_operator(char c, token_start start) -> std::optional<token> {
         return std::nullopt;
     }
 }
-
+  
 auto lexer::scan_slash(token_start start) -> std::optional<token> {
     if (match('/')) {
         skip_line_comment();
@@ -287,6 +332,10 @@ auto lexer::scan_slash(token_start start) -> std::optional<token> {
         return std::nullopt;
     }
 
+    if (match('=')) {
+        return make_token(token_kind::slash_equal, start);
+    }
+
     return make_token(token_kind::slash, start);
 }
 
@@ -295,7 +344,7 @@ auto lexer::skip_line_comment() noexcept -> void {
         advance();
     }
 }
-
+  
 auto lexer::skip_block_comment(token_start start) noexcept -> void {
     while (!is_at_end()) {
         if (peek() == '*' && peek_next() == '/') {
