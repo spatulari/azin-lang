@@ -1,5 +1,0 @@
-add_subdirectory(source)
-add_subdirectory(token)
-add_subdirectory(diagnostic)
-add_subdirectory(lexer)
-add_subdirectory(parser)
