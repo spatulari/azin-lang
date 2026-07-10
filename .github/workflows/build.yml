@@ -13,12 +13,9 @@ concurrency:
 permissions:
     contents: read
 
-env:
-    BUILD_TYPE: Release
-
 jobs:
     build:
-        name: Build and test (${{ matrix.os }})
+        name: Go (${{ matrix.os }})
         runs-on: ${{ matrix.os }}
 
         strategy:
@@ -37,31 +34,37 @@ jobs:
               uses: actions/setup-go@v5
               with:
                 go-version: 'stable'
+                cache: true
 
-            - name: Build (Linux/macOS)
+            - name: Verify formatting
               if: runner.os != 'Windows'
               run: |
-                go build -o build/apps/azc/azc ./cmd/azc
+                test -z "$(gofmt -l .)"
 
-            - name: Build (Windows)
-              if: runner.os == 'Windows'
-              shell: pwsh
-              run: |
-                go build -o build/apps/azc/azc.exe ./cmd/azc
 
-            - name: Test (Linux/macOS)
+            - name: Run go vet
+              run: go vet ./...
+
+            - name: Run tests
+              run: go test ./...
+
+            - name: Build
+              run: go build -o azc ./cmd/compiler
+
+            - name: Verify version (Unix)
               if: runner.os != 'Windows'
               run: |
-                output=$(./build/apps/azc/azc --version)
+                output=$(./azc --version)
                 echo "$output"
-                echo "$output" | grep -qi "azc 0.1.0"
+                echo "$output" | grep -qx "azc 0.1.0"
 
-            - name: Test (Windows)
+            - name: Verify version (Windows)
               if: runner.os == 'Windows'
               shell: pwsh
               run: |
-                $output = .\build\apps\azc\azc.exe --version
+                go build -o azc.exe .\cmd\azc
+                $output = .\azc.exe --version
                 $output
-                if ($output -notmatch 'azc 0\.1\.0') {
-                  throw "Version string not found!"
+                if ($output -ne "azc 0.1.0") {
+                  throw "Unexpected version output: $output"
                 }
