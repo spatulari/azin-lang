@@ -12,7 +12,9 @@ target_include_directories(support_filesystem PUBLIC
         $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(support_filesystem PRIVATE Azin::CompilerFlags)
+target_link_libraries(support_filesystem
+        PRIVATE
+        Azin::CompilerFlags)
 azin_enable_analyzers(support_filesystem)
 
 #-------------------------------------------------------------------------------

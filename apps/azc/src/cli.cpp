@@ -1,73 +1,91 @@
-#include <CLI/CLI.hpp>
-#include <azc/cli.hpp>
-#include <azin/source.hpp>
-#include <cstdio> // NOLINT
-#include <filesystem>
-#include <azin/lexer.hpp>
-#include <azin/token.hpp>
+#include "azin/support/fs/filesystem.hpp"
+
 #include <azin/diagnostic.hpp>
 #include <azin/diagnostic_engine.hpp>
+#include <azin/lexer.hpp>
+#include <azin/source.hpp>
+#include <azin/token.hpp>
 
-// Disable the unreachable code warning for MSVC
-#if defined(_MSC_VER) && !defined(__llvm__)
-    #pragma warning(push)
-    #pragma warning(disable : 4702)
-#endif
-
+#include <CLI/CLI.hpp>
+#include <azc/cli.hpp>
+#include <filesystem>
 #include <fmt/base.h>
 #include <fmt/color.h>
 #include <span>
-
-#if defined(_MSC_VER) && !defined(__llvm__)
-    #pragma warning(pop)
-#endif
-
 #include <string_view>
+#include <utility>
 
 namespace cli = azc::cli;
+namespace frontend = azc::frontend;
+namespace fs = azin::support::fs;
 
 namespace {
 
 template <typename... Args>
-void errorf(fmt::format_string<Args...> fmt_str, Args &&...args) {
-    fmt::print(stderr, fg(fmt::color::red), fmt_str, std::forward<Args>(args)...);
+auto errorf(frontend::diagnostic_severity const severity, fmt::format_string<Args...> fmt,
+            Args &&...args) -> void {
+    auto foreground = fmt::color::white;
+    switch (severity) {
+    case frontend::diagnostic_severity::error:
+        foreground = fmt::color::red;
+        break;
+    case frontend::diagnostic_severity::warning:
+        foreground = fmt::color::yellow;
+        break;
+    case frontend::diagnostic_severity::note:
+        break;
+    }
+    fmt::print(stderr, fg(foreground), fmt, std::forward<Args>(args)...);
     fmt::print(stderr, "\n");
 }
 
-void errprintln(std::string_view const msg) {
-    fmt::print(stderr, fg(fmt::color::red), "error: {}\n", msg);
-}
-
-auto print_token_stream(std::span<azc::frontend::token const> tokens) -> void {
-    for (const auto& token : tokens) {
-        fmt::println(
-            "{} \"{}\" ({}:{})",
-            azc::frontend::token_kind_to_string(token.kind),
-            token.lexeme,
-            token.line,
-            token.column
-        );
+auto print_diagnostics(std::span<frontend::diagnostic const> diagnostics) -> void {
+    for (auto const &[severity, message] : diagnostics) {
+        errorf(severity, "{}", message);
     }
 }
 
-auto print_diagnostics(std::span<azc::frontend::diagnostic const> diagnostics) -> void {
-    for (auto const& diagnostic : diagnostics) {
-        errorf("{}", diagnostic.message);
+auto lex_file(std::filesystem::path input, bool printTokens) -> int {
+    auto file = fs::read_source_file(std::move(input));
+
+    if (!file) {
+        errorf(frontend::diagnostic_severity::error, "{}", file.error().message);
+        return 1;
     }
+
+    source::manager source{std::move(*file), input};
+
+    frontend::diagnostic_engine diagnostics;
+    frontend::lexer lexer{source.text(), source.file_name(), diagnostics};
+
+    print_diagnostics(diagnostics.diagnostics());
+
+    if (printTokens) {
+        for (auto const &token : lexer.tokens()) {
+            fmt::println("{} \"{}\" ({}:{})", frontend::token_kind_to_string(token.kind),
+                         lexer.get_lexeme(token), token.line, token.column);
+
+            if (token.kind == frontend::token_kind::eof) {
+                break;
+            }
+        }
+    }
+
+    return diagnostics.has_errors() ? 1 : 0;
 }
 
 } // namespace
 
-auto cli::run(int const argc, char const *const *argv) -> int {
+auto cli::run(int argc, char const *const *argv) -> int {
     CLI::App app{"Azin Compiler"};
 
-    bool version{false};
-    bool print_tokens{false};
+    bool version = false;
+    bool printTokens = false;
     std::filesystem::path input;
 
-    app.add_flag("--version", version, "Display the compiler's version");
+    app.add_flag("--version", version, "Display the compiler version");
+    app.add_flag("--print-tokens", printTokens, "Print the generated tokens");
     app.add_option("input", input, "Source file to compile");
-    app.add_flag("--print-tokens", print_tokens, "Print the tokens");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -77,29 +95,10 @@ auto cli::run(int const argc, char const *const *argv) -> int {
     }
 
     if (input.empty()) {
-        errprintln("no input file specified\nUsage: azc <source>");
+        errorf(frontend::diagnostic_severity::error,
+               "no input file specified\nUsage: azc <source>");
         return 1;
     }
 
-    source::Manager source{input};
-
-    if (!source.load()) {
-        errorf("failed to open '{}'", input.string());
-        return 1;
-    }
-
-    fmt::println("Loaded {} bytes", source.text().size());
-
-    frontend::diagnostic_engine diagnostics;
-
-    frontend::lexer lexer{source.text(), source.file_name(), diagnostics};
-    auto tokens = lexer.tokenize();
-
-    print_diagnostics(diagnostics.diagnostics());
-
-    if (print_tokens) {
-        print_token_stream(tokens);
-    }
-
-    return 0;
+    return lex_file(std::move(input), printTokens);
 }
