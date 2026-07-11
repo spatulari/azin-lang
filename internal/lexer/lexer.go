@@ -9,14 +9,9 @@ import (
 
 // Lexer breaks source code into tokens.
 type Lexer struct {
-	// file is the source file being lexed.
-	file *source.File
-
-	// offset is the current byte offset within file.
+	file   *source.File
 	offset uint32
-
-	// diag collects diagnostics produced while lexing.
-	diag *diagnostics.Engine
+	diag   *diagnostics.Engine
 }
 
 // New returns a new Lexer for the given file.
