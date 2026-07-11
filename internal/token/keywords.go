@@ -13,4 +13,7 @@ var Keywords = map[string]Kind{
 	"float":  KwFloat,
 	"if":     KwIf,
 	"then":   KwThen,
+	"else":   KwElse,
+	"struct": KwStruct,
+	"is":     KwIs,
 }

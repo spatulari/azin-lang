@@ -1,4 +1,3 @@
-// Package main provides the command-line interface for the Azin compiler.
 package main
 
 import (
@@ -53,14 +52,16 @@ func main() {
 	file := source.New(filename, data)
 
 	diag := diagnostics.New(file)
-	tokens := lexer.New(file, diag).Tokenize()
+
 	if *printTokens {
+		tokens := lexer.New(file, diag).Tokenize()
 		for _, tok := range tokens {
 			fmt.Println(formatToken(file, tok))
 		}
 	}
 
-	if err := compiler.Compile(file); err != nil {
+	err := compiler.Compile(file, *output)
+	if err != nil {
 		fatal(err)
 	}
 
