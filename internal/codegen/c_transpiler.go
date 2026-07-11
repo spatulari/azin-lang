@@ -16,35 +16,16 @@ func New() *Transpiler {
 }
 
 func (t *Transpiler) Transpile(program *ast.Program) string {
-	t.buf.WriteString("#include <stdio.h>\n#include <stdlib.h>\n\n")
-
-	t.buf.WriteString("// Built-in runtime helpers\n")
-	t.buf.WriteString("#ifndef abs\n#define abs(x) ((x) < 0 ? -(x) : (x))\n#endif\n\n")
-
 	for _, stmt := range program.Statements {
 		if s, ok := stmt.(*ast.StructStmt); ok {
 			t.compileStruct(s)
 		}
 	}
 
-	hasMain := false
 	for _, stmt := range program.Statements {
-		if f, ok := stmt.(*ast.FuncStmt); ok {
-			if f.Name.Value == "main" {
-				hasMain = true
-			}
-		}
 		if _, ok := stmt.(*ast.StructStmt); !ok {
 			t.compileStatement(stmt)
 		}
-	}
-
-	if !hasMain {
-		t.buf.WriteString("\n// Auto-generated entry point for standalone execution\n")
-		t.buf.WriteString("int main() {\n")
-		t.buf.WriteString(`    printf("[Azin Runtime] Program completed execution successfully.\n");` + "\n")
-		t.buf.WriteString("    return 0;\n")
-		t.buf.WriteString("}\n")
 	}
 
 	return t.buf.String()
@@ -74,9 +55,7 @@ func (t *Transpiler) compileStatement(stmt ast.Stmt) {
 
 func (t *Transpiler) compileFunc(f *ast.FuncStmt) {
 	retType := f.ReturnType.Value
-	if retType == "int" {
-		retType = "int"
-	}
+
 	fmt.Fprintf(&t.buf, "%s %s(", retType, f.Name.Value)
 	for i, p := range f.Params {
 		fmt.Fprintf(&t.buf, "%s %s", p.Type.Value, p.Name.Value)
@@ -85,9 +64,11 @@ func (t *Transpiler) compileFunc(f *ast.FuncStmt) {
 		}
 	}
 	t.buf.WriteString(") {\n")
+
 	for _, stmt := range f.Body {
 		t.compileStatement(stmt)
 	}
+
 	t.buf.WriteString("}\n")
 }
 
