@@ -2,6 +2,8 @@ package diagnostics
 
 import (
 	"fmt"
+
+	"github.com/azin-lang/Azin/internal/token"
 )
 
 type DiagnosticKind uint8
@@ -11,6 +13,13 @@ const (
 	Warning
 	Error
 )
+
+type Diagnostic struct {
+	Kind     DiagnosticKind
+	Message  string
+	Position token.Position
+	Length   uint32
+}
 
 func (k DiagnosticKind) String() string {
 	switch k {
@@ -23,15 +32,6 @@ func (k DiagnosticKind) String() string {
 	default:
 		return "unknown"
 	}
-}
-
-type Diagnostic struct {
-	Kind    DiagnosticKind
-	Message string
-	Line    int
-	Column  int
-	Offset  int
-	Length  int
 }
 
 func (d Diagnostic) Error() string {

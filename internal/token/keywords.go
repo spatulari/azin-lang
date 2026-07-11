@@ -1,8 +1,5 @@
 package token
 
-// map of keywords to their token kinds
-// regen
-// ok
 var Keywords = map[string]Kind{
 	"fn":     KwFn,
 	"do":     KwDo,
