@@ -53,7 +53,7 @@ jobs:
             - name: Verify version (Unix)
               if: runner.os != 'Windows'
               run: |
-                ./scripts/test/test.sh
+                bash ./scripts/test/test.sh
 
             - name: Verify version (Windows)
               if: runner.os == 'Windows'
