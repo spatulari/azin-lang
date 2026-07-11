@@ -9,7 +9,7 @@ import (
 	"github.com/azin-lang/Azin/internal/fs"
 )
 
-const VERSION = "0.0.1"
+const VERSION = "0.2.3-dev"
 
 var (
 	debug           = flag.Bool("debug", false, "")
