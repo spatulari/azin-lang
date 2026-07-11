@@ -25,6 +25,9 @@ const (
 	KwFloat  // kw_float
 	KwIf     // kw_if
 	KwThen   // kw_then
+	KwElse   // kw_else
+	KwStruct // kw_struct
+	KwIs     // kw_is
 
 	Plus           // plus
 	Minus          // minus
