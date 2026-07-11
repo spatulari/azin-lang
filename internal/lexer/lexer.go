@@ -36,60 +36,45 @@ func (l *Lexer) Tokenize() []token.Token {
 	return tokens
 }
 
-func (l *Lexer) skipComment(start token.Position) bool {
-	switch l.peek() {
-
-	// //
-	case '/':
-		l.advance()
-
-		for !l.eof() {
-			switch l.peek() {
-			case '\n', '\r':
-				return true
-			default:
-				l.advance()
-			}
+func (l *Lexer) skipLineComment() {
+	for !l.eof() {
+		switch l.peek() {
+		case '\n', '\r':
+			return
+		default:
+			_, _ = l.advance()
 		}
+	}
+}
 
-		return true
+func (l *Lexer) skipBlockComment(start token.Position) {
+	depth := 1
 
-	// /*
-	case '*':
-		l.advance()
+	for !l.eof() {
+		ch, _ := l.advance()
 
-		depth := 1
+		switch ch {
+		case '/':
+			if l.match('*') {
+				depth++
+			}
 
-		for !l.eof() {
-			ch, _ := l.advance()
+		case '*':
+			if l.match('/') {
+				depth--
 
-			switch ch {
-			case '/':
-				if l.match('*') {
-					depth++
-				}
-
-			case '*':
-				if l.match('/') {
-					depth--
-
-					if depth == 0 {
-						return true
-					}
+				if depth == 0 {
+					return
 				}
 			}
 		}
-
-		l.diag.ReportError(
-			start,
-			l.offset-start.Offset,
-			"unterminated block comment",
-		)
-
-		return true
 	}
 
-	return false
+	l.diag.ReportError(
+		start,
+		l.offset-start.Offset,
+		"unterminated block comment",
+	)
 }
 
 func (l *Lexer) nextToken() token.Token {
@@ -102,11 +87,6 @@ func (l *Lexer) nextToken() token.Token {
 
 		start := l.position()
 		ch, size := l.advance()
-
-		// comments
-		if ch == '/' && l.skipComment(start) {
-			continue
-		}
 
 		switch {
 		case isIdentifierStart(ch):
@@ -182,10 +162,7 @@ func (l *Lexer) lexSymbol(ch rune, size uint32, start token.Position) token.Toke
 		}
 		return l.token(token.Star, start)
 	case '/':
-		if l.match('=') {
-			return l.token(token.SlashEqual, start)
-		}
-		return l.token(token.Slash, start)
+		return l.lexSlash(start)
 	case '%':
 		if l.match('=') {
 			return l.token(token.ModuloEqual, start)
@@ -241,6 +218,24 @@ func (l *Lexer) lexMinus(start token.Position) token.Token {
 		return l.token(token.Arrow, start)
 	}
 	return l.token(token.Minus, start)
+}
+
+func (l *Lexer) lexSlash(start token.Position) token.Token {
+	switch {
+	case l.match('/'):
+		l.skipLineComment()
+		return l.nextToken()
+
+	case l.match('*'):
+		l.skipBlockComment(start)
+		return l.nextToken()
+
+	case l.match('='):
+		return l.token(token.SlashEqual, start)
+
+	default:
+		return l.token(token.Slash, start)
+	}
 }
 
 func (l *Lexer) lexIdentifier(start token.Position) token.Token {
