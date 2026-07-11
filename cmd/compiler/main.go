@@ -57,21 +57,21 @@ func main() {
 
 	diag := diagnostics.New(file)
 
-	tokens := lexer.New(file, diag).Tokenize()
+	l := lexer.New(file, diag)
 
 	if err := diag.Err(); err != nil {
 		fatal(err)
 	}
 
 	if *printTokens {
-		for _, tok := range tokens {
+		for tok := range l.Tokens() {
 			fmt.Println(formatToken(file, tok))
 		}
 		return
 	}
 
 	if *printAST {
-		p := parser.New(string(file.Slice(0, file.Len())), tokens)
+		p := parser.New(string(file.Slice(0, file.Len())), l.Tokenize())
 		program := p.ParseProgram()
 
 		ast.Print(program)
