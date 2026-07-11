@@ -267,8 +267,6 @@ func (l *Lexer) eof() bool {
 	return l.file.EOF(l.offset)
 }
 
-// peek returns the current byte without advancing the lexer.
-// It returns 0 if the end of the file has been reached.
 func (l *Lexer) peek() byte {
 	if l.eof() {
 		return 0
