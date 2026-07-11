@@ -1,8 +1,6 @@
 package token
 
-// map of keywords to their token kinds
-// regen
-// ok
+// Keywords is a map of keywords to their token kinds.
 var Keywords = map[string]Kind{
 	"fn":     KwFn,
 	"do":     KwDo,

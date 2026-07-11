@@ -1,10 +1,11 @@
 package lexer
 
 import (
-	"github.com/azin-lang/Azin/internal/diagnostics"
-	"github.com/azin-lang/Azin/internal/token"
+	"github.com/azin-lang/Azin/internal/diagnostics" // provides: Engine
+	"github.com/azin-lang/Azin/internal/token" // provides: Token
 )
 
+// Lexer is responsible for tokenizing the input.
 type Lexer struct {
 	input  []byte
 	offset uint32
@@ -13,6 +14,7 @@ type Lexer struct {
 	diag   *diagnostics.Engine
 }
 
+// New creates a new Lexer with the given input and diagnostics engine.
 func New(input []byte, diag *diagnostics.Engine) *Lexer {
 	return &Lexer{
 		input:  input,
@@ -22,6 +24,7 @@ func New(input []byte, diag *diagnostics.Engine) *Lexer {
 	}
 }
 
+// Tokenize tokenizes the input and returns a slice of tokens.
 func (l *Lexer) Tokenize() []token.Token {
 	tokens := make([]token.Token, 0)
 
@@ -37,7 +40,7 @@ func (l *Lexer) Tokenize() []token.Token {
 	return tokens
 }
 
-// wyd
+// next returns the next token in the input stream.
 func (l *Lexer) next() token.Token {
 	l.skipWhitespace()
 
@@ -106,6 +109,7 @@ func (l *Lexer) next() token.Token {
 	}
 }
 
+// lexPlus lexes a plus token, possibly followed by an equals sign.
 func (l *Lexer) lexPlus(start, line, column uint32) token.Token {
 	switch {
 	case l.match('='):
@@ -115,6 +119,7 @@ func (l *Lexer) lexPlus(start, line, column uint32) token.Token {
 	}
 }
 
+// lexMinus lexes a minus token, possibly followed by an equals sign.
 func (l *Lexer) lexMinus(start, line, column uint32) token.Token {
 	switch {
 	case l.match('='):
@@ -124,6 +129,7 @@ func (l *Lexer) lexMinus(start, line, column uint32) token.Token {
 	}
 }
 
+// lexIdentifier lexes an identifier token, possibly a keyword.
 func (l *Lexer) lexIdentifier(start, line, column uint32) token.Token {
 
 	for isAlphaNumeric(l.peek()) {
@@ -138,6 +144,7 @@ func (l *Lexer) lexIdentifier(start, line, column uint32) token.Token {
 	return l.token(kind, start, line, column)
 }
 
+// lexInteger lexes an integer literal token.
 func (l *Lexer) lexInteger(start, line, column uint32) token.Token {
 	for isDigit(l.peek()) {
 		l.advance()
@@ -145,10 +152,12 @@ func (l *Lexer) lexInteger(start, line, column uint32) token.Token {
 	return l.token(token.IntegerLiteral, start, line, column)
 }
 
+// eof returns whether the lexer has reached the end of the input.
 func (l *Lexer) eof() bool {
 	return l.offset >= uint32(len(l.input))
 }
 
+// peek returns the current byte without advancing the lexer.
 func (l *Lexer) peek() byte {
 	if l.eof() {
 		return 0
@@ -156,6 +165,7 @@ func (l *Lexer) peek() byte {
 	return l.input[l.offset]
 }
 
+// match consumes the next byte if it matches the given byte, and returns whether it did.
 func (l *Lexer) match(ch byte) bool {
 	if l.peek() != ch {
 		return false
@@ -164,6 +174,7 @@ func (l *Lexer) match(ch byte) bool {
 	return true
 }
 
+// skipWhitespace skips over any whitespace characters in the input.
 func (l *Lexer) skipWhitespace() {
 	for {
 		switch l.peek() {
@@ -175,20 +186,24 @@ func (l *Lexer) skipWhitespace() {
 	}
 }
 
+// isAlpha returns whether the given byte is an alphabetic character.
 func isAlpha(ch byte) bool {
 	return ch == '_' ||
 		(ch >= 'a' && ch <= 'z') ||
 		(ch >= 'A' && ch <= 'Z')
 }
 
+// isDigit returns whether the given byte is a digit.
 func isDigit(ch byte) bool {
 	return ch >= '0' && ch <= '9'
 }
 
+// isAlphaNumeric returns whether the given byte is an alphabetic or numeric character.
 func isAlphaNumeric(ch byte) bool {
 	return isAlpha(ch) || isDigit(ch)
 }
 
+// advance consumes the next byte and returns it.
 func (l *Lexer) advance() byte {
 	if l.offset >= uint32(len(l.input)) {
 		return 0
@@ -207,6 +222,7 @@ func (l *Lexer) advance() byte {
 	return ch
 }
 
+// token creates a new token with the given kind and position information.
 func (l *Lexer) token(kind token.Kind, start, line, column uint32) token.Token {
 	return token.Token{
 		Kind:   kind,
