@@ -1,44 +1,30 @@
 package compiler
 
 import (
-	"fmt" // provides: Println
+	"fmt"
 
-	"github.com/azin-lang/Azin/internal/diagnostics" // provides: Engine
-	"github.com/azin-lang/Azin/internal/lexer"       // provides: New, Tokenize
-	"github.com/azin-lang/Azin/internal/token"       // provides: Token, Format
+	"github.com/azin-lang/Azin/internal/diagnostics"
+	"github.com/azin-lang/Azin/internal/lexer"
+	"github.com/azin-lang/Azin/internal/token"
 )
 
-// dumpTokens prints the tokens to stdout.
-func dumpTokens(tokens []token.Token, source []byte) {
-	for _, token := range tokens {
-		fmt.Println(token.Format(source))
-	}
-}
-
-// runLexerStage runs the lexer stage and returns the tokens.
-func runLexerStage(source []byte, printTokens bool, diag *diagnostics.Engine) []token.Token {
-	lx := lexer.New(source, diag)
-	tokens := lx.Tokenize()
-
-	if printTokens {
-		dumpTokens(tokens, source)
-	}
-
-	return tokens
-}
-
-// Compile compiles the source code and returns an error if one occurs.
-func Compile(source []byte, printTokens bool) error {
+func Compile(source []byte, showTokens bool) error {
 	diag := diagnostics.New()
-	_ = runLexerStage(source, printTokens, diag)
+	tokens := lex(source, diag)
 
-	/*
-	 * parser := parser.New(lexer)
-	 * ast, err := parser.Parse()
-	 * if err != nil {
-	 *     return err
-	 * }
-	 */
+	if showTokens {
+		printTokens(tokens, source)
+	}
 
 	return diag.Err()
+}
+
+func lex(source []byte, diag *diagnostics.Engine) []token.Token {
+	return lexer.New(source, diag).Tokenize()
+}
+
+func printTokens(tokens []token.Token, source []byte) {
+	for _, tok := range tokens {
+		fmt.Println(tok.Format(source))
+	}
 }
