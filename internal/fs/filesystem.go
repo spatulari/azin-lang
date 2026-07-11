@@ -8,7 +8,7 @@ import (
 
 const SourceExtension = ".az"
 
-func ValidateSourceFile(path string) error {
+func validateSourceFile(path string) error {
 	if ext := filepath.Ext(path); ext != SourceExtension {
 		return fmt.Errorf(
 			"invalid source file %q: expected %q extension, got %q",
@@ -23,7 +23,7 @@ func ValidateSourceFile(path string) error {
 
 func ReadSourceFile(path string, ignoreExtension bool) ([]byte, error) {
 	if !ignoreExtension {
-		if err := ValidateSourceFile(path); err != nil {
+		if err := validateSourceFile(path); err != nil {
 			return nil, err
 		}
 	}
