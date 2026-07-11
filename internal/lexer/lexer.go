@@ -207,21 +207,51 @@ func (l *Lexer) lexString(start token.Position) token.Token {
 		ch, _ := l.advance()
 
 		switch ch {
-		case '\\':
-			if !l.eof() {
-				l.advance()
-			}
-
 		case '"':
 			return l.token(token.StringLiteral, start)
 
+		case '\\':
+			// '\' cannot be the final character
+			if l.eof() {
+				l.diag.ReportError(
+					token.Position{Offset: l.offset - 1},
+					1,
+					"unterminated escape sequence",
+				)
+				return l.token(token.StringLiteral, start)
+			}
+
+			escape := l.advance()
+
+			switch escape {
+			case '"', '\\', 'n', 'r', 't', '0':
+				// Valid escape sequence
+
+			default:
+				l.diag.ReportError(
+					token.Position{Offset: l.offset - 1},
+					1,
+					"invalid escape sequence \\%c",
+					escape,
+				)
+			}
+
 		case '\n', '\r':
-			l.diag.ReportError(start, l.offset-start.Offset, "unterminated string literal")
+			l.diag.ReportError(
+				start,
+				l.offset-start.Offset,
+				"unterminated string literal",
+			)
 			return l.token(token.StringLiteral, start)
 		}
 	}
 
-	l.diag.ReportError(start, l.offset-start.Offset, "unterminated string literal")
+	l.diag.ReportError(
+		start,
+		l.offset-start.Offset,
+		"unterminated string literal",
+	)
+
 	return l.token(token.StringLiteral, start)
 }
 
