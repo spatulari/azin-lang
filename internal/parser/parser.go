@@ -3,6 +3,7 @@ package parser
 import (
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/azin-lang/Azin/internal/ast"
 	"github.com/azin-lang/Azin/internal/token"
@@ -215,7 +216,17 @@ func (p *Parser) parseIntegerLiteral() *ast.IntegerLiteral {
 	start := tok.Position.Offset
 	end := start + tok.Length
 
-	value, _ := strconv.ParseInt(p.source[start:end], 10, 64)
+	text := p.source[start:end]
+
+	var value int64
+	switch {
+	case strings.HasPrefix(text, "0x"):
+		value, _ = strconv.ParseInt(text[2:], 16, 64)
+	case strings.HasPrefix(text, "0b"):
+		value, _ = strconv.ParseInt(text[2:], 2, 64)
+	default:
+		value, _ = strconv.ParseInt(text, 10, 64)
+	}
 
 	return &ast.IntegerLiteral{
 		Token: tok,
