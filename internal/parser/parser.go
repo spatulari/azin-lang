@@ -190,6 +190,7 @@ func (p *Parser) statementEnd() bool {
 
 func (p *Parser) parseStatement() ast.Stmt {
 	p.skipNewlines()
+
 	switch {
 	case p.check(token.KwVar):
 		return p.parseVar()
@@ -209,46 +210,47 @@ func (p *Parser) parseStatement() ast.Stmt {
 		return p.parseImportC()
 
 	default:
-		expr := p.parseExpression(0)
-		if expr == nil {
+		return p.parseExpressionOrAssignment()
+	}
+}
+
+func (p *Parser) parseExpressionOrAssignment() ast.Stmt {
+	expr := p.parseExpression(0)
+	if expr == nil {
+		return nil
+	}
+
+	if p.check(token.Equal) {
+		tok := p.advance()
+
+		switch expr.(type) {
+		case *ast.Identifier, *ast.MemberExpr:
+			// valid assignment target
+		default:
+			p.reportError(tok, "left side of assignment is not assignable")
 			return nil
 		}
 
-		if p.check(token.Equal) {
-			tok := p.advance()
-
-			switch expr.(type) {
-			case *ast.Identifier, *ast.MemberExpr:
-				// valid assignment target
-			default:
-				p.reportError(tok, "left side of assignment is not assignable")
-				return nil
-			}
-
-			value := p.parseExpression(0)
-			if value == nil {
-				return nil
-			}
-
-			if !p.statementEnd() {
-				return nil
-			}
-
-			return &ast.AssignmentStmt{
-				Token: tok,
-				Left:  expr,
-				Value: value,
-			}
-		}
+		value := p.parseExpression(0)
 
 		if !p.statementEnd() {
 			return nil
 		}
 
-		return &ast.ExpressionStmt{
-			Token:      p.previous(),
-			Expression: expr,
+		return &ast.AssignmentStmt{
+			Token: tok,
+			Left:  expr,
+			Value: value,
 		}
+	}
+
+	if !p.statementEnd() {
+		return nil
+	}
+
+	return &ast.ExpressionStmt{
+		Token:      p.previous(),
+		Expression: expr,
 	}
 }
 
