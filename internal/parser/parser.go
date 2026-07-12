@@ -134,6 +134,27 @@ func (p *Parser) parseStatement() ast.Stmt {
 			return nil
 		}
 
+		if p.check(token.Equal) {
+			tok := p.advance()
+
+			switch expr.(type) {
+			case *ast.Identifier, *ast.MemberExpr:
+				// valid assignment target
+			default:
+				panic("left side of assignment is not assignable")
+			}
+
+			value := p.parseExpression(0)
+
+			p.statementEnd()
+
+			return &ast.AssignmentStmt{
+				Token: tok,
+				Left:  expr,
+				Value: value,
+			}
+		}
+
 		p.statementEnd()
 
 		return &ast.ExpressionStmt{

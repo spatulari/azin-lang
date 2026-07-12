@@ -35,6 +35,19 @@ func (p *Program) TokenLiteral() string {
 // Statements
 //
 
+// AssignmentStmt represents an assignment
+type AssignmentStmt struct {
+	Token token.Token // =
+	Left  Expr
+	Value Expr
+}
+
+func (*AssignmentStmt) stmtNode() {}
+
+func (a *AssignmentStmt) TokenLiteral() string {
+	return a.Token.Kind.String()
+}
+
 // StructStmt represents a struct declaration.
 type StructStmt struct {
 	Token  token.Token // struct

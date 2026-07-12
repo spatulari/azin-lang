@@ -112,9 +112,10 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 		}
 
 		a.declare(&Symbol{
-			Name: n.Name.Value,
-			Type: n.Type,
-			Kind: SymbolVariable,
+			Name:    n.Name.Value,
+			Type:    n.Type,
+			Kind:    SymbolVariable,
+			Mutable: n.Mutable,
 		})
 
 	case *ast.IfStmt:
@@ -133,6 +134,43 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 		}
 
 		a.popScope()
+
+	case *ast.AssignmentStmt:
+		switch left := n.Left.(type) {
+
+		case *ast.Identifier:
+			sym := a.lookup(left.Value)
+			if sym == nil {
+				panic("unknown variable: " + left.Value)
+			}
+
+			if sym.Kind != SymbolVariable {
+				panic(left.Value + " is not a variable")
+			}
+
+			if !sym.Mutable {
+				panic("cannot assign to immutable variable '" + left.Value + "'")
+			}
+
+			got := a.inferExprType(n.Value)
+
+			if got != nil && sym.Type != nil && got.Value != sym.Type.Value {
+				panic(
+					"cannot assign " +
+						got.Value +
+						" to variable '" +
+						left.Value +
+						"' of type " +
+						sym.Type.Value,
+				)
+			}
+
+		case *ast.MemberExpr:
+			// TODO: struct field assignment
+
+		default:
+			panic("left side of assignment is not assignable")
+		}
 	}
 }
 

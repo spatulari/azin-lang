@@ -11,9 +11,10 @@ const (
 )
 
 type Symbol struct {
-	Name string
-	Type *ast.Identifier
-	Kind SymbolKind
+	Name    string
+	Type    *ast.Identifier
+	Kind    SymbolKind
+	Mutable bool
 
 	Function *ast.FuncStmt
 	Struct   *ast.StructStmt
