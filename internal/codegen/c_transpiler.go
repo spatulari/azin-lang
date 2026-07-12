@@ -3,6 +3,7 @@ package codegen
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 
 	"github.com/azin-lang/Azin/internal/ast"
 	"github.com/azin-lang/Azin/internal/token"
@@ -147,6 +148,9 @@ func (t *Transpiler) compileExpression(expr ast.Expr) {
 	case *ast.IntegerLiteral:
 		t.printf("%d", n.Value)
 
+	case *ast.FloatLiteral:
+		t.printf("%s", strconv.FormatFloat(n.Value, 'g', -1, 64))
+
 	case *ast.StringLiteral:
 		t.printf("%q", n.Value)
 
@@ -163,7 +167,7 @@ func (t *Transpiler) compileExpression(expr ast.Expr) {
 		t.compileExpression(n.Right)
 
 	case *ast.CallExpr:
-		t.write(n.Function.Value)
+		t.compileExpression(n.Callee)
 		t.write("(")
 
 		for i, arg := range n.Args {
