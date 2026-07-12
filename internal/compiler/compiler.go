@@ -16,106 +16,120 @@ import (
 	"github.com/azin-lang/Azin/internal/source"
 )
 
-func runMSVC(cl, sourcePath, exeName string) error {
-	cmd := exec.Command(
-		cl,
-		"/nologo",
-		"/O2",
-		"/Fe:"+exeName,
-		sourcePath,
-	)
-
+func runCompilerCommand(name string, args []string, label, output string) error {
+	cmd := exec.Command(name, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	fmt.Println("[MSVC] Compiling...")
+	fmt.Printf("[%s] Compiling...\n", label)
+
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("cl.exe compilation failed: %w", err)
+		return fmt.Errorf("%s compilation failed: %w", label, err)
 	}
 
-	fmt.Printf("[Success] %s\n", exeName)
+	fmt.Printf("[Success] %s\n", output)
 	return nil
+}
+
+func runMSVC(cl, sourcePath, exeName string) error {
+	return runCompilerCommand(
+		cl,
+		[]string{
+			"/nologo",
+			"/O2",
+			"/Fe:" + exeName,
+			sourcePath,
+		},
+		"MSVC",
+		exeName,
+	)
 }
 
 func runClang(clang, sourcePath, exeName string) error {
-	cmd := exec.Command(
+	return runCompilerCommand(
 		clang,
-		"-std=c23",
-		"-O2",
-		sourcePath,
-		"-o",
+		[]string{
+			"-std=c23",
+			"-O2",
+			sourcePath,
+			"-o",
+			exeName,
+		},
+		"Clang",
 		exeName,
 	)
-
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	fmt.Println("[Clang] Compiling...")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("clang compilation failed: %w", err)
-	}
-
-	fmt.Printf("[Success] %s\n", exeName)
-	return nil
 }
 
 func runGCC(gcc, sourcePath, exeName string) error {
-	cmd := exec.Command(
+	return runCompilerCommand(
 		gcc,
-		"-std=c23",
-		"-O2",
-		sourcePath,
-		"-o",
+		[]string{
+			"-std=c23",
+			"-O2",
+			sourcePath,
+			"-o",
+			exeName,
+		},
+		"GCC",
 		exeName,
 	)
+}
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	fmt.Println("[GCC] Compiling...")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("gcc compilation failed: %w", err)
-	}
-
-	fmt.Printf("[Success] %s\n", exeName)
-	return nil
+type compiler struct {
+	name string
+	run  func(string, string, string) error
 }
 
 func runCompiler(sourcePath, exeName string) error {
+	var compilers []compiler
+
 	switch runtime.GOOS {
 	case "windows":
-		if cl, err := exec.LookPath("cl.exe"); err == nil {
-			return runMSVC(cl, sourcePath, exeName)
-		}
-		if gcc, err := exec.LookPath("gcc"); err == nil {
-			return runGCC(gcc, sourcePath, exeName)
-		}
-		if clang, err := exec.LookPath("clang"); err == nil {
-			return runClang(clang, sourcePath, exeName)
+		compilers = []compiler{
+			{"cl.exe", runMSVC},
+			{"gcc", runGCC},
+			{"clang", runClang},
 		}
 
 	case "darwin":
-		// Apple's default compiler is Clang.
-		if clang, err := exec.LookPath("clang"); err == nil {
-			return runClang(clang, sourcePath, exeName)
-		}
-		if gcc, err := exec.LookPath("gcc"); err == nil {
-			return runGCC(gcc, sourcePath, exeName)
+		compilers = []compiler{
+			{"clang", runClang},
+			{"gcc", runGCC},
 		}
 
-	default: // Linux, BSD, etc
-		if gcc, err := exec.LookPath("gcc"); err == nil {
-			return runGCC(gcc, sourcePath, exeName)
-		}
-		if clang, err := exec.LookPath("clang"); err == nil {
-			return runClang(clang, sourcePath, exeName)
+	default:
+		compilers = []compiler{
+			{"gcc", runGCC},
+			{"clang", runClang},
 		}
 	}
 
-	return fmt.Errorf("no supported C compiler found (searched for gcc, clang, and cl.exe)")
+	for _, c := range compilers {
+		if path, err := exec.LookPath(c.name); err == nil {
+			return c.run(path, sourcePath, exeName)
+		}
+	}
+
+	return fmt.Errorf("no supported C compiler found")
 }
 
-// compile the given source file to a C executable.
+func writeCOutput(code, output string) error {
+	if output == "" {
+		output = "output.c"
+	}
+	if filepath.Ext(output) != ".c" {
+		output += ".c"
+	}
+
+	if err := os.WriteFile(output, []byte(code), 0644); err != nil {
+		return fmt.Errorf("failed to write C source: %w", err)
+	}
+
+	fmt.Printf("[Success] Generated C source: %s\n", output)
+	return nil
+}
+
+// Compile compiles the given source file to a C executable.
 func Compile(file *source.File, outputPath string, emitC bool) error {
 	program, err := parseSource(file)
 	if err != nil {
@@ -123,43 +137,38 @@ func Compile(file *source.File, outputPath string, emitC bool) error {
 	}
 
 	cCode := transpileToC(program)
+
 	if emitC {
-		if outputPath == "" {
-			outputPath = "output.c"
-		}
-
-		if filepath.Ext(outputPath) != ".c" {
-			outputPath += ".c"
-		}
-
-		if err := os.WriteFile(outputPath, []byte(cCode), 0644); err != nil {
-			return fmt.Errorf("failed to write C source: %w", err)
-		}
-
-		fmt.Printf("[Success] Generated C source: %s\n", outputPath)
-		return nil
+		return writeCOutput(cCode, outputPath)
 	}
+
 	exeName := resolveExeName(outputPath)
 
 	tmpPath, err := writeToTempFile(cCode)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmpPath)
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			panic(err)
+		}
+	}(tmpPath)
 
 	return runCompiler(tmpPath, exeName)
 }
 
 func parseSource(file *source.File) (*ast.Program, error) {
 	diag := diagnostics.New(file)
+
 	tokens := lexer.New(file, diag).Tokenize()
 	if err := diag.Err(); err != nil {
 		return nil, err
 	}
 
-	sourceString := string(file.Slice(0, file.Len()))
-	p := parser.New(sourceString, tokens)
-	program := p.ParseProgram()
+	parser := parser.New(string(file.Slice(0, file.Len())), tokens)
+	program := parser.ParseProgram()
+
 	return program, diag.Err()
 }
 
@@ -168,34 +177,33 @@ func transpileToC(program *ast.Program) string {
 	return tx.Transpile(program)
 }
 
-func resolveExeName(outputPath string) string {
-	if outputPath == "" {
+func resolveExeName(output string) string {
+	if output == "" {
 		if runtime.GOOS == "windows" {
 			return "output.exe"
 		}
 		return "output"
 	}
 
-	if before, ok := strings.CutSuffix(outputPath, ".c"); ok {
-		outputPath = before
+	output = strings.TrimSuffix(output, ".c")
+
+	if runtime.GOOS == "windows" && filepath.Ext(output) != ".exe" {
+		output += ".exe"
 	}
 
-	if runtime.GOOS == "windows" && filepath.Ext(outputPath) != ".exe" {
-		outputPath += ".exe"
-	}
-
-	return outputPath
+	return output
 }
 
 func writeToTempFile(content string) (string, error) {
-	tmpFile, err := os.CreateTemp("", "azin_*.c")
+	f, err := os.CreateTemp("", "azin_*.c")
 	if err != nil {
-		return "", fmt.Errorf("failed to create translation buffer: %w", err)
+		return "", fmt.Errorf("failed to create temp source: %w", err)
 	}
-	defer tmpFile.Close()
+	defer f.Close()
 
-	if _, err := tmpFile.WriteString(content); err != nil {
-		return "", fmt.Errorf("failed to populate compile buffer: %w", err)
+	if _, err := f.WriteString(content); err != nil {
+		return "", fmt.Errorf("failed to write temp source: %w", err)
 	}
-	return tmpFile.Name(), nil
+
+	return f.Name(), nil
 }
