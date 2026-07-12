@@ -34,8 +34,42 @@ func (p *Parser) ParseProgram() *ast.Program {
 	return program
 }
 
+func (p *Parser) expect(kind token.Kind, message string) token.Token {
+	if p.check(kind) {
+		return p.advance()
+	}
+
+	panic(message)
+}
+
+func (p *Parser) parseVar() ast.Stmt {
+	tok := p.advance()
+
+	name := p.parseIdentifier()
+
+	var typ *ast.Identifier
+	if p.match(token.Colon) {
+		typ = p.parseType()
+	}
+
+	p.expect(token.Equal, "expected '=' after variable declaration")
+
+	value := p.parseExpression(0)
+
+	p.match(token.Semicolon)
+
+	return &ast.VarStmt{
+		Token: tok,
+		Name:  name,
+		Type:  typ,
+		Value: value,
+	}
+}
+
 func (p *Parser) parseStatement() ast.Stmt {
 	switch {
+	case p.check(token.KwVar):
+		return p.parseVar()
 	case p.check(token.KwStruct):
 		return p.parseStruct()
 
@@ -141,9 +175,7 @@ func (p *Parser) parseFunc() ast.Stmt {
 		retType = p.parseType()
 	}
 
-	if !p.match(token.KwDo) {
-		panic("expected 'do' after function declaration")
-	}
+	p.expect(token.KwDo, "expected 'do' after function declaration")
 
 	body := []ast.Stmt{}
 	for !p.isAtEnd() && !p.check(token.KwEnd) {

@@ -109,6 +109,25 @@ func (t *Transpiler) compileStatement(stmt ast.Stmt) {
 		t.write(";")
 		t.newline()
 
+	case *ast.VarStmt:
+		t.writeIndent()
+
+		typ := "int" // temporary default until semantic analysis
+
+		if n.Type != nil {
+			typ = emitType(n.Type.Value)
+		}
+
+		t.printf("%s %s", typ, n.Name.Value)
+
+		if n.Value != nil {
+			t.write(" = ")
+			t.compileExpression(n.Value)
+		}
+
+		t.write(";")
+		t.newline()
+
 	default:
 		panic(fmt.Sprintf("unsupported statement %T", stmt))
 	}

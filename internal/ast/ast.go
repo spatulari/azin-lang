@@ -213,3 +213,16 @@ func (m *MemberExpr) TokenLiteral() string {
 }
 
 func (*MemberExpr) exprNode() {}
+
+type VarStmt struct {
+	Token token.Token // var
+	Name  *Identifier
+	Type  *Identifier
+	Value Expr
+}
+
+func (*VarStmt) stmtNode() {}
+
+func (v *VarStmt) TokenLiteral() string {
+	return v.Token.Kind.String()
+}
