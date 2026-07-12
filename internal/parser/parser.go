@@ -227,16 +227,9 @@ func (p *Parser) parseExpression(precedence int) ast.Expr {
 			continue
 		}
 
-		if p.check(token.Minus) && precedence < 2 {
+		if (p.check(token.Minus) || p.check(token.Plus)) && precedence < 2 {
 			op := p.advance()
 			right := p.parseExpression(2)
-			left = &ast.BinaryExpr{Left: left, Operator: op, Right: right}
-			continue
-		}
-
-		if p.check(token.Plus) && precedence < 1 {
-			op := p.advance()
-			right := p.parseExpression(1)
 			left = &ast.BinaryExpr{Left: left, Operator: op, Right: right}
 			continue
 		}
