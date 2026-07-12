@@ -112,13 +112,11 @@ func (t *Transpiler) compileStatement(stmt ast.Stmt) {
 	case *ast.VarStmt:
 		t.writeIndent()
 
-		typ := "int" // temporary default until semantic analysis
-
-		if n.Type != nil {
-			typ = emitType(n.Type.Value)
+		if n.Type == nil {
+			panic("internal compiler error: variable has no resolved type")
 		}
 
-		t.printf("%s %s", typ, n.Name.Value)
+		t.printf("%s %s", emitType(n.Type.Value), n.Name.Value)
 
 		if n.Value != nil {
 			t.write(" = ")
@@ -134,15 +132,17 @@ func (t *Transpiler) compileStatement(stmt ast.Stmt) {
 }
 
 func (t *Transpiler) compileFunc(fn *ast.FuncStmt) {
-	retType := "void"
-
-	if fn.ReturnType != nil {
-		retType = emitType(fn.ReturnType.Value)
+	if fn.ReturnType == nil {
+		panic("internal compiler error: function has no resolved return type")
 	}
 
-	t.printf("%s %s(", retType, fn.Name.Value)
+	t.printf("%s %s(", emitType(fn.ReturnType.Value), fn.Name.Value)
 
 	for i, p := range fn.Params {
+		if p.Type == nil {
+			panic("internal compiler error: parameter has no resolved type")
+		}
+
 		if i > 0 {
 			t.write(", ")
 		}

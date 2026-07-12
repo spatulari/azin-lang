@@ -13,6 +13,7 @@ import (
 	"github.com/azin-lang/Azin/internal/diagnostics"
 	"github.com/azin-lang/Azin/internal/lexer"
 	"github.com/azin-lang/Azin/internal/parser"
+	"github.com/azin-lang/Azin/internal/semantic"
 	"github.com/azin-lang/Azin/internal/source"
 )
 
@@ -133,6 +134,12 @@ func writeCOutput(code, output string) error {
 func Compile(file *source.File, outputPath string, emitC bool) error {
 	program, err := parseSource(file)
 	if err != nil {
+		return err
+	}
+
+	analyzer := semantic.New()
+
+	if err := analyzer.Analyze(program); err != nil {
 		return err
 	}
 
