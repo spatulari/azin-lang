@@ -7,32 +7,35 @@ import (
 	"path/filepath"
 )
 
-/*
- * prints the AST to the console or exports it to a file.
- * @param node the AST node to print
- * @param export whether to export the AST to a file
- * @param outputPath the path to export the AST to
- */
-func Print(node Node, export bool, outputPath string) {
+// PrintJSON serializes the AST node to JSON and prints it to standard output.
+func PrintJSON(node Node) error {
 	data, err := json.MarshalIndent(node, "", "  ")
 	if err != nil {
-		fmt.Println(err)
-		return
+		return fmt.Errorf("failed to marshal AST: %w", err)
 	}
 
-	if export {
-		if err := os.MkdirAll(outputPath, 0755); err != nil {
-			fmt.Println(err)
-			return
-		}
+	fmt.Println(string(data))
+	return nil
+}
 
-		filepath := filepath.Join(outputPath, "ast.json")
-		if err := os.WriteFile(filepath, data, 0644); err != nil {
-			fmt.Println(err)
-		}
-
-		fmt.Println("AST saved to", filepath)
-	} else {
-		fmt.Println(string(data))
+// ExportJSON serializes the AST node to JSON and writes it to the specified destination path.
+// The destPath should include the desired file name (e.g., "out/ast.json").
+func ExportJSON(node Node, destPath string) error {
+	data, err := json.MarshalIndent(node, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal AST: %w", err)
 	}
+
+	// Ensure the parent directories exist based on the provided file path
+	dir := filepath.Dir(destPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	// Write the file
+	if err := os.WriteFile(destPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write AST file: %w", err)
+	}
+
+	return nil
 }
