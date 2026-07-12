@@ -18,6 +18,7 @@ func (t *Transpiler) compileStruct(s *ast.StructStmt) {
 
 	t.popIndent()
 	t.printf("} %s;\n", s.Name.Value)
+	t.newline()
 }
 
 func (t *Transpiler) compileStatement(stmt ast.Stmt) {
@@ -60,6 +61,10 @@ func (t *Transpiler) compileStatement(stmt ast.Stmt) {
 			panic("internal compiler error: variable '" + n.Name.Value + "' has no resolved type")
 		}
 
+		if !n.Mutable {
+			t.write("const ")
+		}
+
 		t.printf("%s %s", emitType(n.Type.Value), n.Name.Value)
 
 		if n.Value != nil {
@@ -67,6 +72,14 @@ func (t *Transpiler) compileStatement(stmt ast.Stmt) {
 			t.compileExpression(n.Value)
 		}
 
+		t.write(";")
+		t.newline()
+
+	case *ast.AssignmentStmt:
+		t.writeIndent()
+		t.compileExpression(n.Left)
+		t.write(" = ")
+		t.compileExpression(n.Value)
 		t.write(";")
 		t.newline()
 

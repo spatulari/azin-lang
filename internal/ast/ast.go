@@ -35,6 +35,19 @@ func (p *Program) TokenLiteral() string {
 // Statements
 //
 
+// AssignmentStmt represents an assignment
+type AssignmentStmt struct {
+	Token token.Token // =
+	Left  Expr
+	Value Expr
+}
+
+func (*AssignmentStmt) stmtNode() {}
+
+func (a *AssignmentStmt) TokenLiteral() string {
+	return a.Token.Kind.String()
+}
+
 // StructStmt represents a struct declaration.
 type StructStmt struct {
 	Token  token.Token // struct
@@ -122,8 +135,9 @@ func (*ExpressionStmt) stmtNode() {}
 // FieldDecl represents either a parameter declaration
 // or a struct field declaration.
 type FieldDecl struct {
-	Name *Identifier
-	Type *Identifier
+	Name    *Identifier
+	Type    *Identifier
+	Mutable bool
 }
 
 func (f *FieldDecl) TokenLiteral() string {
@@ -236,10 +250,11 @@ func (m *MemberExpr) TokenLiteral() string {
 func (*MemberExpr) exprNode() {}
 
 type VarStmt struct {
-	Token token.Token // var
-	Name  *Identifier
-	Type  *Identifier
-	Value Expr
+	Token   token.Token // var
+	Name    *Identifier
+	Type    *Identifier
+	Value   Expr
+	Mutable bool
 }
 
 func (*VarStmt) stmtNode() {}

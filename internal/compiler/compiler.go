@@ -173,8 +173,13 @@ func parseSource(file *source.File) (*ast.Program, error) {
 		return nil, err
 	}
 
-	parser := parser.New(string(file.Slice(0, file.Len())), tokens)
+	parser := parser.New(string(file.Slice(0, file.Len())), tokens, diag)
+
 	program := parser.ParseProgram()
+
+	if err := parser.Err(); err != nil {
+		return nil, err
+	}
 
 	return program, diag.Err()
 }

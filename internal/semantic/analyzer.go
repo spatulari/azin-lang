@@ -58,6 +58,25 @@ func (a *Analyzer) Analyze(program *ast.Program) error {
 	return nil
 }
 
+func (a *Analyzer) lookupStruct(name string) *ast.StructStmt {
+	sym := a.lookup(name)
+	if sym == nil || sym.Kind != SymbolStruct {
+		return nil
+	}
+
+	return sym.Struct
+}
+
+func (a *Analyzer) lookupField(strct *ast.StructStmt, name string) *ast.FieldDecl {
+	for _, field := range strct.Fields {
+		if field.Name.Value == name {
+			return field
+		}
+	}
+
+	return nil
+}
+
 func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 	switch n := stmt.(type) {
 
@@ -109,12 +128,26 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 	case *ast.VarStmt:
 		if n.Type == nil {
 			n.Type = a.inferExprType(n.Value)
+		} else if n.Value != nil {
+			got := a.inferExprType(n.Value)
+
+			if got != nil && got.Value != n.Type.Value {
+				panic(
+					"cannot initialize variable '" +
+						n.Name.Value +
+						"' of type " +
+						n.Type.Value +
+						"' with value of type " +
+						got.Value,
+				)
+			}
 		}
 
 		a.declare(&Symbol{
-			Name: n.Name.Value,
-			Type: n.Type,
-			Kind: SymbolVariable,
+			Name:    n.Name.Value,
+			Type:    n.Type,
+			Kind:    SymbolVariable,
+			Mutable: n.Mutable,
 		})
 
 	case *ast.IfStmt:
@@ -133,6 +166,83 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 		}
 
 		a.popScope()
+
+	case *ast.AssignmentStmt:
+		switch left := n.Left.(type) {
+
+		case *ast.Identifier:
+			sym := a.lookup(left.Value)
+			if sym == nil {
+				panic("unknown variable: " + left.Value)
+			}
+
+			if sym.Kind != SymbolVariable {
+				panic(left.Value + " is not a variable")
+			}
+
+			if !sym.Mutable {
+				panic("cannot assign to immutable variable '" + left.Value + "'")
+			}
+
+			got := a.inferExprType(n.Value)
+
+			if got != nil && sym.Type != nil && got.Value != sym.Type.Value {
+				panic(
+					"cannot assign " +
+						got.Value +
+						" to variable '" +
+						left.Value +
+						"' of type " +
+						sym.Type.Value,
+				)
+			}
+
+		case *ast.MemberExpr:
+			objectType := a.inferExprType(left.Object)
+			if objectType == nil {
+				panic("cannot determine type of member access")
+			}
+
+			strct := a.lookupStruct(objectType.Value)
+			if strct == nil {
+				panic("'" + objectType.Value + "' is not a struct")
+			}
+
+			field := a.lookupField(strct, left.Property.Value)
+			if field == nil {
+				panic(
+					"struct '" +
+						strct.Name.Value +
+						"' has no field '" +
+						left.Property.Value +
+						"'",
+				)
+			}
+
+			if !field.Mutable {
+				panic(
+					"cannot assign to immutable field '" +
+						field.Name.Value +
+						"'",
+				)
+			}
+
+			got := a.inferExprType(n.Value)
+
+			if got != nil && got.Value != field.Type.Value {
+				panic(
+					"cannot assign " +
+						got.Value +
+						" to field '" +
+						field.Name.Value +
+						"' of type " +
+						field.Type.Value,
+				)
+			}
+
+		default:
+			panic("left side of assignment is not assignable")
+		}
 	}
 }
 
@@ -280,8 +390,29 @@ func (a *Analyzer) inferExprType(expr ast.Expr) *ast.Identifier {
 		return left
 
 	case *ast.MemberExpr:
-		// TODO: struct field lookup
-		return nil
+		objectType := a.inferExprType(n.Object)
+		if objectType == nil {
+			return nil
+		}
+
+		strct := a.lookupStruct(objectType.Value)
+		if strct == nil {
+			panic("'" + objectType.Value + "' is not a struct")
+		}
+
+		for _, field := range strct.Fields {
+			if field.Name.Value == n.Property.Value {
+				return field.Type
+			}
+		}
+
+		panic(
+			"struct '" +
+				strct.Name.Value +
+				"' has no field '" +
+				n.Property.Value +
+				"'",
+		)
 	}
 
 	return nil
