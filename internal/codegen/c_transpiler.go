@@ -5,11 +5,13 @@ import (
 	"fmt"
 
 	"github.com/azin-lang/Azin/internal/ast"
+	"github.com/azin-lang/Azin/internal/token"
 )
 
 // the Transpiler struct is responsible for transpiling the AST to C code.
 type Transpiler struct {
-	buf bytes.Buffer
+	buf    bytes.Buffer
+	indent int
 }
 
 // create a new Transpiler.
@@ -34,75 +36,177 @@ func (t *Transpiler) Transpile(program *ast.Program) string {
 	return t.buf.String()
 }
 
-func (t *Transpiler) compileStruct(s *ast.StructStmt) {
-	fmt.Fprintf(&t.buf, "typedef struct {\n")
-	for _, f := range s.Fields {
-		typeStr := f.Type.Value
-		if typeStr == "int" {
-			typeStr = "int"
-		}
-		fmt.Fprintf(&t.buf, "    %s %s;\n", typeStr, f.Name.Value)
+func (t *Transpiler) write(s string) {
+	t.buf.WriteString(s)
+}
+
+func (t *Transpiler) printf(format string, args ...any) {
+	fmt.Fprintf(&t.buf, format, args...)
+}
+
+func (t *Transpiler) newline() {
+	t.buf.WriteByte('\n')
+}
+
+func (t *Transpiler) writeIndent() {
+	for i := 0; i < t.indent; i++ {
+		t.write("    ")
 	}
-	fmt.Fprintf(&t.buf, "} %s;\n\n", s.Name.Value)
+}
+
+func (t *Transpiler) pushIndent() {
+	t.indent++
+}
+
+func (t *Transpiler) popIndent() {
+	t.indent--
+}
+
+func (t *Transpiler) compileStruct(s *ast.StructStmt) {
+	t.write("typedef struct {\n")
+	t.pushIndent()
+
+	for _, field := range s.Fields {
+		t.writeIndent()
+		t.printf("%s %s;\n", emitType(field.Type.Value), field.Name.Value)
+	}
+
+	t.popIndent()
+	t.printf("} %s;\n\n", s.Name.Value)
 }
 
 func (t *Transpiler) compileStatement(stmt ast.Stmt) {
 	switch s := stmt.(type) {
 	case *ast.FuncStmt:
 		t.compileFunc(s)
+
 	case *ast.ReturnStmt:
-		t.buf.WriteString("    return ")
-		t.compileExpression(s.Value)
-		t.buf.WriteString(";\n")
+		t.writeIndent()
+		t.write("return")
+
+		if s.Value != nil {
+			t.write(" ")
+			t.compileExpression(s.Value)
+		}
+
+		t.write(";")
+		t.newline()
+
+	case *ast.ExpressionStmt:
+		t.writeIndent()
+		t.compileExpression(s.Expression)
+		t.write(";")
+		t.newline()
+
+	default:
+		panic(fmt.Sprintf("unsupported statement %T", stmt))
 	}
 }
 
-func (t *Transpiler) compileFunc(f *ast.FuncStmt) {
-	retType := f.ReturnType.Value
+func (t *Transpiler) compileFunc(fn *ast.FuncStmt) {
+	t.printf("%s %s(", emitType(fn.ReturnType.Value), fn.Name.Value)
 
-	fmt.Fprintf(&t.buf, "%s %s(", retType, f.Name.Value)
-	for i, p := range f.Params {
-		fmt.Fprintf(&t.buf, "%s %s", p.Type.Value, p.Name.Value)
-		if i < len(f.Params)-1 {
-			t.buf.WriteString(", ")
+	for i, p := range fn.Params {
+		if i > 0 {
+			t.write(", ")
 		}
-	}
-	t.buf.WriteString(") {\n")
 
-	for _, stmt := range f.Body {
+		t.printf("%s %s", emitType(p.Type.Value), p.Name.Value)
+	}
+
+	t.write(") {\n")
+
+	t.pushIndent()
+
+	for _, stmt := range fn.Body {
 		t.compileStatement(stmt)
 	}
 
-	t.buf.WriteString("}\n")
+	t.popIndent()
+
+	t.write("}\n")
 }
 
 func (t *Transpiler) compileExpression(expr ast.Expr) {
-	switch e := expr.(type) {
+	switch n := expr.(type) {
+
 	case *ast.Identifier:
-		t.buf.WriteString(e.Value)
+		t.write(n.Value)
+
+	case *ast.IntegerLiteral:
+		t.printf("%d", n.Value)
+
+	case *ast.StringLiteral:
+		t.printf("%q", n.Value)
+
 	case *ast.MemberExpr:
-		t.compileExpression(e.Object)
-		t.buf.WriteString(".")
-		t.buf.WriteString(e.Property.Value)
+		t.compileExpression(n.Object)
+		t.write(".")
+		t.write(n.Property.Value)
+
 	case *ast.BinaryExpr:
-		t.compileExpression(e.Left)
-		opStr := e.Operator.Kind.String()
-		if opStr == "plus" {
-			opStr = "+"
-		} else if opStr == "minus" {
-			opStr = "-"
-		}
-		fmt.Fprintf(&t.buf, " %s ", opStr)
-		t.compileExpression(e.Right)
+		t.compileExpression(n.Left)
+		t.write(" ")
+		t.write(emitOperator(n.Operator.Kind))
+		t.write(" ")
+		t.compileExpression(n.Right)
+
 	case *ast.CallExpr:
-		t.buf.WriteString(e.Function.Value)
-		t.buf.WriteString("(")
-		for i, arg := range e.Args {
-			t.compileExpression(arg)
-			if i < len(e.Args)-1 {
-				t.buf.WriteString(", ")
+		t.write(n.Function.Value)
+		t.write("(")
+
+		for i, arg := range n.Args {
+			if i > 0 {
+				t.write(", ")
 			}
+			t.compileExpression(arg)
 		}
-		t.buf.WriteString(")")
+
+		t.write(")")
+
+	default:
+		panic(fmt.Sprintf("unsupported expression %T", expr))
+	}
+}
+
+func emitOperator(kind token.Kind) string {
+	switch kind {
+	case token.Plus:
+		return "+"
+	case token.Minus:
+		return "-"
+	case token.Star:
+		return "*"
+	case token.Slash:
+		return "/"
+	case token.EqualEqual:
+		return "=="
+	case token.BangEqual:
+		return "!="
+	case token.Less:
+		return "<"
+	case token.LessEqual:
+		return "<="
+	case token.Greater:
+		return ">"
+	case token.GreaterEqual:
+		return ">="
+	default:
+		panic(fmt.Sprintf("unsupported operator %v", kind))
+	}
+}
+
+func emitType(name string) string {
+	switch name {
+	case "int":
+		return "int"
+	case "float":
+		return "float"
+	case "char":
+		return "char"
+	case "string":
+		return "char*"
+	default:
+		return name
 	}
 }
