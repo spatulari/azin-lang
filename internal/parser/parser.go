@@ -27,28 +27,28 @@ func New(source string, tokens []token.Token, diag *diagnostics.Engine) *Parser 
 }
 
 func (p *Parser) synchronize() {
+	if p.isAtEnd() {
+		return
+	}
 	p.advance()
 
 	for !p.isAtEnd() {
-		if p.previous().Kind == token.Newline ||
-			p.previous().Kind == token.Semicolon {
+		if p.previous().Kind == token.Newline || p.previous().Kind == token.Semicolon {
 			return
 		}
 
 		switch p.peek().Kind {
-		case token.KwFn,
-			token.KwStruct,
-			token.KwVar,
-			token.KwIf,
-			token.KwReturn,
-			token.KwElse,
-			token.KwImportC,
-			token.KwEnd:
+		case token.KwFn, token.KwStruct, token.KwVar, token.KwIf,
+			token.KwReturn, token.KwElse, token.KwImportC, token.KwEnd:
 			return
 		default:
 			p.advance()
 		}
 	}
+}
+
+func (p *Parser) lexeme(tok token.Token) string {
+	return p.source[tok.Position.Offset : tok.Position.Offset+tok.Length]
 }
 
 func (p *Parser) error(tok token.Token, format string, args ...any) {
