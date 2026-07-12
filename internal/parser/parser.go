@@ -27,7 +27,7 @@ func New(source string, tokens []token.Token, diag *diagnostics.Engine) *Parser 
 }
 
 func (p *Parser) synchronize() {
-	p.advance() // consume at least a token (no deadlocks I hope)
+	p.advance()
 
 	for !p.isAtEnd() {
 		if p.previous().Kind == token.Newline ||
@@ -45,9 +45,9 @@ func (p *Parser) synchronize() {
 			token.KwImportC,
 			token.KwEnd:
 			return
+		default:
+			p.advance()
 		}
-
-		p.advance()
 	}
 }
 
