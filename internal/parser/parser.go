@@ -94,24 +94,13 @@ func (p *Parser) expect(kind token.Kind, context string) (token.Token, bool) {
 	}
 
 	got := p.peek()
-
-	if context == "" {
-		p.reportError(
-			got,
-			"expected %s %s, found %s",
-			kind.DisplayName(),
-			context,
-			got.Kind.DisplayName(),
-		)
-	} else {
-		p.reportError(
-			got,
-			"expected %s %s, found %s",
-			kind.DisplayName(),
-			context,
-			got.Kind.DisplayName(),
-		)
-	}
+	p.reportError(
+		got,
+		"expected %s %s, found %s",
+		kind.DisplayName(),
+		context,
+		got.Kind.DisplayName(),
+	)
 
 	return got, false
 }
