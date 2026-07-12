@@ -58,6 +58,15 @@ func (a *Analyzer) Analyze(program *ast.Program) error {
 	return nil
 }
 
+func (a *Analyzer) lookupStruct(name string) *ast.StructStmt {
+	sym := a.lookup(name)
+	if sym == nil || sym.Kind != SymbolStruct {
+		return nil
+	}
+
+	return sym.Struct
+}
+
 func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 	switch n := stmt.(type) {
 
@@ -179,7 +188,19 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 			}
 
 		case *ast.MemberExpr:
-			// TODO: struct field assignment
+			fieldType := a.inferExprType(left)
+			got := a.inferExprType(n.Value)
+
+			if fieldType != nil && got != nil && fieldType.Value != got.Value {
+				panic(
+					"cannot assign " +
+						got.Value +
+						" to field '" +
+						left.Property.Value +
+						"' of type " +
+						fieldType.Value,
+				)
+			}
 
 		default:
 			panic("left side of assignment is not assignable")
@@ -331,8 +352,29 @@ func (a *Analyzer) inferExprType(expr ast.Expr) *ast.Identifier {
 		return left
 
 	case *ast.MemberExpr:
-		// TODO: struct field lookup
-		return nil
+		objectType := a.inferExprType(n.Object)
+		if objectType == nil {
+			return nil
+		}
+
+		strct := a.lookupStruct(objectType.Value)
+		if strct == nil {
+			panic("'" + objectType.Value + "' is not a struct")
+		}
+
+		for _, field := range strct.Fields {
+			if field.Name.Value == n.Property.Value {
+				return field.Type
+			}
+		}
+
+		panic(
+			"struct '" +
+				strct.Name.Value +
+				"' has no field '" +
+				n.Property.Value +
+				"'",
+		)
 	}
 
 	return nil
