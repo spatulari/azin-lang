@@ -155,10 +155,7 @@ func (p *Parser) parseIf() ast.Stmt {
 
 	var thenBody []ast.Stmt
 
-	for !p.isAtEnd() &&
-		!p.check(token.KwElse) &&
-		!p.check(token.KwEnd) {
-
+	for !(p.isAtEnd() || p.checkAny(token.KwElse, token.KwEnd)) {
 		if stmt := p.parseStatement(); stmt != nil {
 			thenBody = append(thenBody, stmt)
 		} else {
@@ -209,9 +206,17 @@ func (p *Parser) parseExpression(precedence int) ast.Expr {
 	}
 
 	for !p.isAtEnd() {
-		if p.check(token.LeftParen) && precedence < 4 {
+		nextPrec := getPrecedence(p.peek().Kind)
+
+		// If the next token isn't an operator, or its precedence is lower/equal, stop.
+		if precedence >= nextPrec || nextPrec == 0 {
+			break
+		}
+
+		switch {
+		case p.check(token.LeftParen):
 			p.advance()
-			args := []ast.Expr{}
+			var args []ast.Expr
 			for !p.check(token.RightParen) {
 				args = append(args, p.parseExpression(0))
 				if !p.check(token.RightParen) {
@@ -220,23 +225,18 @@ func (p *Parser) parseExpression(precedence int) ast.Expr {
 			}
 			p.advance()
 			left = &ast.CallExpr{Callee: left, Args: args}
-			continue
-		}
 
-		if p.check(token.Dot) && precedence < 3 {
+		case p.check(token.Dot):
 			p.advance()
 			prop := p.parseIdentifier()
 			left = &ast.MemberExpr{Object: left, Property: prop}
-			continue
-		}
 
-		if (p.check(token.Minus) || p.check(token.Plus)) && precedence < 2 {
+		default:
+			// All binary operators are handled by this
 			op := p.advance()
-			right := p.parseExpression(2)
+			right := p.parseExpression(nextPrec)
 			left = &ast.BinaryExpr{Left: left, Operator: op, Right: right}
-			continue
 		}
-		break
 	}
 	return left
 }
@@ -345,10 +345,34 @@ func (p *Parser) check(kind token.Kind) bool {
 	return p.peek().Kind == kind
 }
 
+func (p *Parser) checkAny(kinds ...token.Kind) bool {
+	if p.isAtEnd() {
+		return false
+	}
+	return slices.Contains(kinds, p.peek().Kind)
+}
+
 func (p *Parser) match(kinds ...token.Kind) bool {
 	if slices.ContainsFunc(kinds, p.check) {
 		p.advance()
 		return true
 	}
 	return false
+}
+
+// getPrecedence returns the binding power of a given token kind.
+// Returns 0 if the token is not an infix operator.
+func getPrecedence(kind token.Kind) int {
+	switch kind {
+	case token.LeftParen:
+		return 4
+	case token.Dot:
+		return 3
+	case token.Plus, token.Minus:
+		return 2
+	case token.Greater, token.GreaterEqual, token.Less, token.LessEqual:
+		return 1
+	default:
+		return 0
+	}
 }
