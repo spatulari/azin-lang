@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/azin-lang/Azin/internal/ast"
+	"github.com/azin-lang/Azin/internal/diagnostics"
 	"github.com/azin-lang/Azin/internal/token"
 )
 
@@ -13,10 +14,25 @@ type Parser struct {
 	source  string
 	tokens  []token.Token
 	current int
+
+	diag *diagnostics.Engine
 }
 
-func New(source string, tokens []token.Token) *Parser {
-	return &Parser{source: source, tokens: tokens, current: 0}
+func New(source string, tokens []token.Token, diag *diagnostics.Engine) *Parser {
+	return &Parser{
+		source: source,
+		tokens: tokens,
+		diag:   diag,
+	}
+}
+
+func (p *Parser) error(tok token.Token, format string, args ...any) {
+	p.diag.ReportError(tok.Position, tok.Length, format, args...)
+}
+
+func (p *Parser) fail(tok token.Token, format string, args ...any) {
+	p.error(tok, format, args...)
+	panic(p.diag)
 }
 
 func (p *Parser) ParseProgram() *ast.Program {
@@ -34,12 +50,24 @@ func (p *Parser) ParseProgram() *ast.Program {
 	return program
 }
 
-func (p *Parser) expect(kind token.Kind, message string) token.Token {
+func (p *Parser) Err() error {
+	return p.diag.Err()
+}
+
+func (p *Parser) expect(kind token.Kind, context string) token.Token {
 	if p.check(kind) {
 		return p.advance()
 	}
 
-	panic(message)
+	got := p.peek()
+
+	if context == "" {
+		p.fail(got, "expected %q, found %q", kind, got.Kind)
+	}
+
+	p.fail(got, "expected %q %s, found %q", kind, context, got.Kind)
+
+	return token.Token{}
 }
 
 func (p *Parser) parseVar() ast.Stmt {
@@ -62,7 +90,10 @@ func (p *Parser) parseVar() ast.Stmt {
 	if p.match(token.Equal) {
 		value = p.parseExpression(0)
 	} else if typ == nil {
-		panic("expected '=' or explicit type in variable declaration")
+		p.fail(
+			p.peek(),
+			"expected '=' or an explicit type in variable declaration",
+		)
 	}
 
 	p.statementEnd()
@@ -80,7 +111,7 @@ func (p *Parser) parseImportC() ast.Stmt {
 	tok := p.advance()
 
 	if !p.check(token.StringLiteral) {
-		panic("expected C header after 'importC'")
+		p.fail(p.peek(), "expected string literal after 'importC'")
 	}
 
 	path := p.parseStringLiteral()
@@ -109,7 +140,10 @@ func (p *Parser) statementEnd() {
 		return
 	}
 
-	panic("expected end of statement")
+	p.fail(
+		p.peek(),
+		"expected end of statement (newline or ';'",
+	)
 }
 
 func (p *Parser) parseStatement() ast.Stmt {
@@ -145,7 +179,7 @@ func (p *Parser) parseStatement() ast.Stmt {
 			case *ast.Identifier, *ast.MemberExpr:
 				// valid assignment target
 			default:
-				panic("left side of assignment is not assignable")
+				p.fail(tok, "left side of assignment is not assignable")
 			}
 
 			value := p.parseExpression(0)
@@ -172,7 +206,7 @@ func (p *Parser) parseStruct() ast.Stmt {
 	tok := p.advance()
 	name := p.parseIdentifier()
 
-	p.expect(token.KwIs, "expected 'is'")
+	p.expect(token.KwIs, "after struct name")
 	p.skipNewlines()
 
 	fields := []*ast.FieldDecl{}
@@ -188,7 +222,7 @@ func (p *Parser) parseStruct() ast.Stmt {
 
 		fName := p.parseIdentifier()
 
-		p.expect(token.Colon, "expected ':' after field name")
+		p.expect(token.Colon, "after field name")
 
 		tName := p.parseType()
 
@@ -201,7 +235,7 @@ func (p *Parser) parseStruct() ast.Stmt {
 		})
 	}
 
-	p.expect(token.KwEnd, "expected 'end'")
+	p.expect(token.KwEnd, "to close struct")
 
 	return &ast.StructStmt{
 		Token:  tok,
@@ -256,11 +290,11 @@ func (p *Parser) parseFunc() ast.Stmt {
 			})
 
 			if !p.check(token.RightParen) {
-				p.expect(token.Comma, "expected ','")
+				p.expect(token.Comma, "between parameters")
 			}
 		}
 
-		p.expect(token.RightParen, "expected ')'")
+		p.expect(token.RightParen, "after parameter list")
 	}
 	var retType *ast.Identifier
 
@@ -268,7 +302,7 @@ func (p *Parser) parseFunc() ast.Stmt {
 		retType = p.parseType()
 	}
 
-	p.expect(token.KwDo, "expected 'do' after function declaration")
+	p.expect(token.KwDo, "after function declaration")
 
 	p.skipNewlines()
 
@@ -287,7 +321,7 @@ func (p *Parser) parseFunc() ast.Stmt {
 		}
 	}
 
-	p.expect(token.KwEnd, "expected 'end'")
+	p.expect(token.KwEnd, "to close function")
 
 	return &ast.FuncStmt{Token: tok, Name: name, Params: params, ReturnType: retType, Body: body}
 }
@@ -323,7 +357,7 @@ func (p *Parser) parseIf() ast.Stmt {
 
 	condition := p.parseExpression(0)
 
-	p.expect(token.KwThen, "expected 'then'")
+	p.expect(token.KwThen, "after if condition")
 
 	p.skipNewlines()
 
@@ -363,7 +397,7 @@ func (p *Parser) parseIf() ast.Stmt {
 
 	p.skipNewlines()
 
-	p.expect(token.KwEnd, "expected 'end'")
+	p.expect(token.KwEnd, "to close if statement")
 
 	p.skipNewlines()
 
@@ -424,7 +458,7 @@ func (p *Parser) parseExpression(precedence int) ast.Expr {
 			for !p.check(token.RightParen) {
 				args = append(args, p.parseExpression(0))
 				if !p.check(token.RightParen) {
-					p.expect(token.Comma, "expected ','")
+					p.expect(token.Comma, "between arguments")
 				}
 			}
 			p.advance()
@@ -446,7 +480,7 @@ func (p *Parser) parseExpression(precedence int) ast.Expr {
 }
 
 func (p *Parser) parseIdentifier() *ast.Identifier {
-	tok := p.expect(token.Identifier, "expected identifier")
+	tok := p.expect(token.Identifier, "")
 
 	start := tok.Position.Offset
 	end := start + tok.Length
@@ -508,7 +542,7 @@ func (p *Parser) parseStringLiteral() *ast.StringLiteral {
 
 	value, err := strconv.Unquote(raw)
 	if err != nil {
-		panic(err)
+		p.fail(tok, "invalid string literal: %v", err)
 	}
 
 	return &ast.StringLiteral{
@@ -527,7 +561,7 @@ func (p *Parser) parseCharacterLiteral() *ast.CharacterLiteral {
 
 	value, _, _, err := strconv.UnquoteChar(raw[1:len(raw)-1], '\'')
 	if err != nil {
-		panic(err)
+		p.fail(tok, "invalid character literal: %v", err)
 	}
 
 	return &ast.CharacterLiteral{
