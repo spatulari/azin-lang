@@ -9,6 +9,7 @@ var Keywords = map[string]Kind{
 	"end":    KwEnd,
 	"char":   KwChar,
 	"int":    KwInt,
+	"unit":   KwUnit,
 	"str":    KwString,
 	"float":  KwFloat,
 	"if":     KwIf,

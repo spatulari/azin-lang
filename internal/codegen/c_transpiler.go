@@ -115,7 +115,13 @@ func (t *Transpiler) compileStatement(stmt ast.Stmt) {
 }
 
 func (t *Transpiler) compileFunc(fn *ast.FuncStmt) {
-	t.printf("%s %s(", emitType(fn.ReturnType.Value), fn.Name.Value)
+	retType := "void"
+
+	if fn.ReturnType != nil {
+		retType = emitType(fn.ReturnType.Value)
+	}
+
+	t.printf("%s %s(", retType, fn.Name.Value)
 
 	for i, p := range fn.Params {
 		if i > 0 {
@@ -250,6 +256,8 @@ func emitOperator(kind token.Kind) string {
 
 func emitType(name string) string {
 	switch name {
+	case "unit":
+		return "void"
 	case "int":
 		return "int"
 	case "float":

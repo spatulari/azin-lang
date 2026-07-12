@@ -74,19 +74,41 @@ func (p *Parser) parseStruct() ast.Stmt {
 		fName := p.parseIdentifier()
 		p.match(token.Colon)
 
-		var tName *ast.Identifier
-		if p.check(token.KwInt) {
-			tTok := p.advance()
-			tName = &ast.Identifier{Token: tTok, Value: "int"}
-		} else {
-			tName = p.parseIdentifier()
-		}
+		tName := p.parseType()
 		p.match(token.Semicolon)
 
 		fields = append(fields, &ast.FieldDecl{Name: fName, Type: tName})
 	}
 	p.match(token.KwEnd)
 	return &ast.StructStmt{Token: tok, Name: name, Fields: fields}
+}
+
+func (p *Parser) parseType() *ast.Identifier {
+	switch p.peek().Kind {
+
+	case token.KwUnit:
+		tok := p.advance()
+		return &ast.Identifier{Token: tok, Value: "unit"}
+
+	case token.KwInt:
+		tok := p.advance()
+		return &ast.Identifier{Token: tok, Value: "int"}
+
+	case token.KwFloat:
+		tok := p.advance()
+		return &ast.Identifier{Token: tok, Value: "float"}
+
+	case token.KwString:
+		tok := p.advance()
+		return &ast.Identifier{Token: tok, Value: "string"}
+
+	case token.KwChar:
+		tok := p.advance()
+		return &ast.Identifier{Token: tok, Value: "char"}
+
+	default:
+		return p.parseIdentifier()
+	}
 }
 
 func (p *Parser) parseFunc() ast.Stmt {
@@ -99,7 +121,7 @@ func (p *Parser) parseFunc() ast.Stmt {
 		for !p.isAtEnd() && !p.check(token.RightParen) {
 			pName := p.parseIdentifier()
 			p.match(token.Colon)
-			pType := p.parseIdentifier()
+			pType := p.parseType()
 
 			params = append(params, &ast.FieldDecl{
 				Name: pName,
@@ -113,14 +135,10 @@ func (p *Parser) parseFunc() ast.Stmt {
 
 		p.match(token.RightParen)
 	}
-	p.match(token.Colon)
-
 	var retType *ast.Identifier
-	if p.check(token.KwInt) {
-		tTok := p.advance()
-		retType = &ast.Identifier{Token: tTok, Value: "int"}
-	} else {
-		retType = p.parseIdentifier()
+
+	if p.match(token.Colon) {
+		retType = p.parseType()
 	}
 
 	p.match(token.KwDo)
@@ -141,9 +159,18 @@ func (p *Parser) parseFunc() ast.Stmt {
 
 func (p *Parser) parseReturn() ast.Stmt {
 	tok := p.advance()
-	val := p.parseExpression(0)
+
+	var value ast.Expr
+	if !p.check(token.Semicolon) {
+		value = p.parseExpression(0)
+	}
+
 	p.match(token.Semicolon)
-	return &ast.ReturnStmt{Token: tok, Value: val}
+
+	return &ast.ReturnStmt{
+		Token: tok,
+		Value: value,
+	}
 }
 
 func (p *Parser) parseIf() ast.Stmt {
