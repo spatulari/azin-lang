@@ -184,6 +184,8 @@ func (p *Parser) parseStruct() ast.Stmt {
 			break
 		}
 
+		mutable := p.match(token.KwMut)
+
 		fName := p.parseIdentifier()
 
 		p.expect(token.Colon, "expected ':' after field name")
@@ -193,8 +195,9 @@ func (p *Parser) parseStruct() ast.Stmt {
 		p.statementEnd()
 
 		fields = append(fields, &ast.FieldDecl{
-			Name: fName,
-			Type: tName,
+			Name:    fName,
+			Type:    tName,
+			Mutable: mutable,
 		})
 	}
 

@@ -67,6 +67,16 @@ func (a *Analyzer) lookupStruct(name string) *ast.StructStmt {
 	return sym.Struct
 }
 
+func (a *Analyzer) lookupField(strct *ast.StructStmt, name string) *ast.FieldDecl {
+	for _, field := range strct.Fields {
+		if field.Name.Value == name {
+			return field
+		}
+	}
+
+	return nil
+}
+
 func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 	switch n := stmt.(type) {
 
@@ -188,17 +198,45 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 			}
 
 		case *ast.MemberExpr:
-			fieldType := a.inferExprType(left)
+			objectType := a.inferExprType(left.Object)
+			if objectType == nil {
+				panic("cannot determine type of member access")
+			}
+
+			strct := a.lookupStruct(objectType.Value)
+			if strct == nil {
+				panic("'" + objectType.Value + "' is not a struct")
+			}
+
+			field := a.lookupField(strct, left.Property.Value)
+			if field == nil {
+				panic(
+					"struct '" +
+						strct.Name.Value +
+						"' has no field '" +
+						left.Property.Value +
+						"'",
+				)
+			}
+
+			if !field.Mutable {
+				panic(
+					"cannot assign to immutable field '" +
+						field.Name.Value +
+						"'",
+				)
+			}
+
 			got := a.inferExprType(n.Value)
 
-			if fieldType != nil && got != nil && fieldType.Value != got.Value {
+			if got != nil && got.Value != field.Type.Value {
 				panic(
 					"cannot assign " +
 						got.Value +
 						" to field '" +
-						left.Property.Value +
+						field.Name.Value +
 						"' of type " +
-						fieldType.Value,
+						field.Type.Value,
 				)
 			}
 
