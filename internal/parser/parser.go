@@ -180,17 +180,11 @@ func (p *Parser) statementEnd() bool {
 		return true
 	}
 
-	if p.check(token.EOF) ||
-		p.check(token.KwEnd) ||
-		p.check(token.KwElse) {
+	if p.checkAny(token.EOF, token.KwEnd, token.KwElse) {
 		return true
 	}
 
-	p.reportError(
-		p.peek(),
-		"expected end of statement (newline or ';')",
-	)
-
+	p.reportError(p.peek(), "expected end of statement (newline or ';')")
 	return false
 }
 
