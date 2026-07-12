@@ -236,10 +236,11 @@ func (m *MemberExpr) TokenLiteral() string {
 func (*MemberExpr) exprNode() {}
 
 type VarStmt struct {
-	Token token.Token // var
-	Name  *Identifier
-	Type  *Identifier
-	Value Expr
+	Token   token.Token // var
+	Name    *Identifier
+	Type    *Identifier
+	Value   Expr
+	Mutable bool
 }
 
 func (*VarStmt) stmtNode() {}

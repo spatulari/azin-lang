@@ -19,7 +19,7 @@ const Version = "0.2.3-dev"
 
 var (
 	debug           = flag.Bool("debug", false, "Enable debug output")
-	printTokens     = flag.Bool("tokens", false, "Print lexer tokens")
+	printTokens     = flag.Bool("print-tokens", false, "Print lexer tokens")
 	printAST        = flag.Bool("print-ast", false, "Print the parsed AST")
 	output          = flag.String("o", "", "Output file")
 	ignoreExtension = flag.Bool("ignore-extension", false, "Ignore source file extension")

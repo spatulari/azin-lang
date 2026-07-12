@@ -60,6 +60,10 @@ func (t *Transpiler) compileStatement(stmt ast.Stmt) {
 			panic("internal compiler error: variable '" + n.Name.Value + "' has no resolved type")
 		}
 
+		if !n.Mutable {
+			t.write("const ")
+		}
+
 		t.printf("%s %s", emitType(n.Type.Value), n.Name.Value)
 
 		if n.Value != nil {

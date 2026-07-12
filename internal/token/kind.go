@@ -18,6 +18,7 @@ const (
 	KwFn      // kw_fn
 	KwDo      // kw_do
 	KwVar     // kw_var
+	KwMut     // kw_mut
 	KwReturn  // kw_return
 	KwEnd     // kw_end
 	KwChar    // kw_char

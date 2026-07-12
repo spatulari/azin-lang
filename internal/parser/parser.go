@@ -45,6 +45,11 @@ func (p *Parser) expect(kind token.Kind, message string) token.Token {
 func (p *Parser) parseVar() ast.Stmt {
 	tok := p.advance()
 
+	mutable := false
+	if p.match(token.KwMut) {
+		mutable = true
+	}
+
 	name := p.parseIdentifier()
 
 	var typ *ast.Identifier
@@ -59,10 +64,11 @@ func (p *Parser) parseVar() ast.Stmt {
 	p.statementEnd()
 
 	return &ast.VarStmt{
-		Token: tok,
-		Name:  name,
-		Type:  typ,
-		Value: value,
+		Token:   tok,
+		Name:    name,
+		Type:    typ,
+		Value:   value,
+		Mutable: mutable,
 	}
 }
 
@@ -220,14 +226,20 @@ func (p *Parser) parseFunc() ast.Stmt {
 	p.skipNewlines()
 
 	body := []ast.Stmt{}
-	for !p.isAtEnd() && !p.check(token.KwEnd) {
+
+	for {
+		p.skipNewlines()
+
+		if p.isAtEnd() || p.check(token.KwEnd) {
+			break
+		}
+
 		stmt := p.parseStatement()
 		if stmt != nil {
 			body = append(body, stmt)
-		} else {
-			p.advance()
 		}
 	}
+
 	p.expect(token.KwEnd, "expected 'end'")
 
 	return &ast.FuncStmt{Token: tok, Name: name, Params: params, ReturnType: retType, Body: body}
@@ -270,11 +282,16 @@ func (p *Parser) parseIf() ast.Stmt {
 
 	var thenBody []ast.Stmt
 
-	for !(p.isAtEnd() || p.checkAny(token.KwElse, token.KwEnd)) {
-		if stmt := p.parseStatement(); stmt != nil {
+	for {
+		p.skipNewlines()
+
+		if p.isAtEnd() || p.checkAny(token.KwElse, token.KwEnd) {
+			break
+		}
+
+		stmt := p.parseStatement()
+		if stmt != nil {
 			thenBody = append(thenBody, stmt)
-		} else {
-			p.advance()
 		}
 	}
 
@@ -283,11 +300,16 @@ func (p *Parser) parseIf() ast.Stmt {
 	if p.match(token.KwElse) {
 		p.skipNewlines()
 
-		for !p.isAtEnd() && !p.check(token.KwEnd) {
-			if stmt := p.parseStatement(); stmt != nil {
+		for {
+			p.skipNewlines()
+
+			if p.isAtEnd() || p.check(token.KwEnd) {
+				break
+			}
+
+			stmt := p.parseStatement()
+			if stmt != nil {
 				elseBody = append(elseBody, stmt)
-			} else {
-				p.advance()
 			}
 		}
 	}

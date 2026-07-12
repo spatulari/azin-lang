@@ -5,6 +5,7 @@ var Keywords = map[string]Kind{
 	"fn":      KwFn,
 	"do":      KwDo,
 	"var":     KwVar,
+	"mut":     KwMut,
 	"return":  KwReturn,
 	"end":     KwEnd,
 	"char":    KwChar,
