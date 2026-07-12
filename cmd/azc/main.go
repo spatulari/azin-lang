@@ -56,26 +56,38 @@ func main() {
 	file := source.New(filename, data)
 
 	diag := diagnostics.New(file)
-
 	l := lexer.New(file, diag)
+	tokens := l.Tokenize()
 
 	if err := diag.Err(); err != nil {
 		fatal(err)
 	}
 
 	if *printTokens {
-		for tok := range l.Tokens() {
+		for _, tok := range tokens {
 			fmt.Println(formatToken(file, tok))
 		}
 		return
 	}
 
-	if *printAST {
-		p := parser.New(string(file.Slice(0, file.Len())), l.Tokenize(), diag)
-		program := p.ParseProgram()
+	p := parser.New(string(file.Slice(0, file.Len())), tokens, diag)
+	program := p.ParseProgram()
 
-		ast.Print(program, false, ".")
+	parseErr := diag.Err()
+
+	if *printAST {
+		if err := ast.PrintJSON(program); err != nil {
+			fatal(err)
+		}
+
+		if parseErr != nil {
+			fatal(parseErr)
+		}
 		return
+	}
+
+	if parseErr != nil {
+		fatal(parseErr)
 	}
 
 	err := compiler.Compile(file, *output, *emitC)
