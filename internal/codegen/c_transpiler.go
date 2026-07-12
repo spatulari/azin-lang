@@ -28,9 +28,12 @@ func (t *Transpiler) Transpile(program *ast.Program) string {
 	}
 
 	for _, stmt := range program.Statements {
-		if _, ok := stmt.(*ast.StructStmt); !ok {
-			t.compileStatement(stmt)
+		if _, ok := stmt.(*ast.StructStmt); ok {
+			continue
 		}
+
+		t.compileStatement(stmt)
+		t.newline()
 	}
 
 	return t.buf.String()
