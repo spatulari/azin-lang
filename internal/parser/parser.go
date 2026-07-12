@@ -2,6 +2,7 @@ package parser
 
 import (
 	"slices"
+	"strconv"
 
 	"github.com/azin-lang/Azin/internal/ast"
 	"github.com/azin-lang/Azin/internal/token"
@@ -33,16 +34,29 @@ func (p *Parser) ParseProgram() *ast.Program {
 }
 
 func (p *Parser) parseStatement() ast.Stmt {
-	if p.check(token.KwStruct) {
+	switch {
+	case p.check(token.KwStruct):
 		return p.parseStruct()
-	}
-	if p.check(token.KwFn) {
+
+	case p.check(token.KwFn):
 		return p.parseFunc()
-	}
-	if p.check(token.KwReturn) {
+
+	case p.check(token.KwReturn):
 		return p.parseReturn()
+
+	default:
+		expr := p.parseExpression(0)
+		if expr == nil {
+			return nil
+		}
+
+		p.match(token.Semicolon)
+
+		return &ast.ExpressionStmt{
+			Token:      p.previous(),
+			Expression: expr,
+		}
 	}
-	return nil
 }
 
 func (p *Parser) parseStruct() ast.Stmt {
@@ -131,9 +145,17 @@ func (p *Parser) parseReturn() ast.Stmt {
 func (p *Parser) parseExpression(precedence int) ast.Expr {
 	var left ast.Expr
 
-	if p.check(token.Identifier) {
+	switch {
+	case p.check(token.Identifier):
 		left = p.parseIdentifier()
-	} else {
+
+	case p.check(token.IntegerLiteral):
+		left = p.parseIntegerLiteral()
+
+	case p.check(token.StringLiteral):
+		left = p.parseStringLiteral()
+
+	default:
 		return nil
 	}
 
@@ -185,6 +207,39 @@ func (p *Parser) parseIdentifier() *ast.Identifier {
 	realValue := p.source[start:end]
 
 	return &ast.Identifier{Token: tok, Value: realValue}
+}
+
+func (p *Parser) parseIntegerLiteral() *ast.IntegerLiteral {
+	tok := p.advance()
+
+	start := tok.Position.Offset
+	end := start + tok.Length
+
+	value, _ := strconv.ParseInt(p.source[start:end], 10, 64)
+
+	return &ast.IntegerLiteral{
+		Token: tok,
+		Value: value,
+	}
+}
+
+func (p *Parser) parseStringLiteral() *ast.StringLiteral {
+	tok := p.advance()
+
+	start := tok.Position.Offset
+	end := start + tok.Length
+
+	raw := p.source[start:end]
+
+	value, err := strconv.Unquote(raw)
+	if err != nil {
+		panic(err)
+	}
+
+	return &ast.StringLiteral{
+		Token: tok,
+		Value: value,
+	}
 }
 
 func (p *Parser) peek() token.Token {
