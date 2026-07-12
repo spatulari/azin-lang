@@ -79,6 +79,7 @@ func (t *Transpiler) compileStatement(stmt ast.Stmt) {
 	switch s := stmt.(type) {
 	case *ast.FuncStmt:
 		t.compileFunc(s)
+		t.newline()
 
 	case *ast.ReturnStmt:
 		t.writeIndent()
