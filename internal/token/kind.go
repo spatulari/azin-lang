@@ -15,21 +15,22 @@ const (
 	FloatLiteral     // float_literal
 	CharacterLiteral // character_literal
 
-	KwFn     // kw_fn
-	KwDo     // kw_do
-	KwVar    // kw_var
-	KwReturn // kw_return
-	KwEnd    // kw_end
-	KwChar   // kw_char
-	KwInt    // kw_int
-	KwUnit   // kw_unit
-	KwString // kw_string
-	KwFloat  // kw_float
-	KwIf     // kw_if
-	KwThen   // kw_then
-	KwElse   // kw_else
-	KwStruct // kw_struct
-	KwIs     // kw_is
+	KwFn      // kw_fn
+	KwDo      // kw_do
+	KwVar     // kw_var
+	KwReturn  // kw_return
+	KwEnd     // kw_end
+	KwChar    // kw_char
+	KwInt     // kw_int
+	KwUnit    // kw_unit
+	KwString  // kw_string
+	KwFloat   // kw_float
+	KwIf      // kw_if
+	KwThen    // kw_then
+	KwElse    // kw_else
+	KwStruct  // kw_struct
+	KwIs      // kw_is
+	KwImportC // kw_import
 
 	Plus           // plus
 	Minus          // minus

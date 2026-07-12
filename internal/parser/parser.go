@@ -66,6 +66,24 @@ func (p *Parser) parseVar() ast.Stmt {
 	}
 }
 
+func (p *Parser) parseImportC() ast.Stmt {
+	tok := p.advance() // consume 'import'
+
+	p.match(token.LeftParen)
+
+	// Parse the path string literal
+	strTok := p.advance()
+	pathExpr := &ast.StringLiteral{
+		Token: strTok,
+		Value: p.source[strTok.Position.Offset : strTok.Position.Offset+strTok.Length], // Slices the path clean
+	}
+
+	p.match(token.RightParen)
+	p.match(token.Semicolon) // Match optional or explicit trailing semicolon if required
+
+	return &ast.ImportCStmt{Token: tok, Path: pathExpr}
+}
+
 func (p *Parser) parseStatement() ast.Stmt {
 	switch {
 	case p.check(token.KwVar):
@@ -81,6 +99,9 @@ func (p *Parser) parseStatement() ast.Stmt {
 
 	case p.check(token.KwIf):
 		return p.parseIf()
+
+	case p.check(token.KwImportC):
+		return p.parseImportC()
 
 	default:
 		expr := p.parseExpression(0)

@@ -89,6 +89,15 @@ func (i *IfStmt) TokenLiteral() string {
 
 func (*IfStmt) stmtNode() {}
 
+// ImportStmt represents an import statement.
+type ImportCStmt struct {
+	Token token.Token
+	Path  *StringLiteral
+}
+
+func (i *ImportCStmt) TokenLiteral() string { return i.Token.Kind.String() }
+func (i *ImportCStmt) stmtNode()            {}
+
 // ExpressionStmt represents an expression used as a statement.
 //
 // Example:
