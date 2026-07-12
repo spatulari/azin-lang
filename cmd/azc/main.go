@@ -29,7 +29,7 @@ var (
 
 func init() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags] <file>\n\n", os.Args[0])
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags] <file>\n\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 }
@@ -100,15 +100,15 @@ func printDebug() {
 }
 
 func mustReadSource(filename string) []byte {
-	source, err := fs.ReadSourceFile(filename, *ignoreExtension)
+	data, err := fs.ReadSourceFile(filename, *ignoreExtension)
 	if err != nil {
 		fatal(err)
 	}
-	return source
+	return data
 }
 
 func fatal(err error) {
-	fmt.Fprintln(os.Stderr, err)
+	_, _ = fmt.Fprintln(os.Stderr, err)
 	os.Exit(1)
 }
 
