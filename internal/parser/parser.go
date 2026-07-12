@@ -141,7 +141,9 @@ func (p *Parser) parseFunc() ast.Stmt {
 		retType = p.parseType()
 	}
 
-	p.match(token.KwDo)
+	if !p.match(token.KwDo) {
+		panic("expected 'do' after function declaration")
+	}
 
 	body := []ast.Stmt{}
 	for !p.isAtEnd() && !p.check(token.KwEnd) {
