@@ -109,6 +109,19 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 	case *ast.VarStmt:
 		if n.Type == nil {
 			n.Type = a.inferExprType(n.Value)
+		} else if n.Value != nil {
+			got := a.inferExprType(n.Value)
+
+			if got != nil && got.Value != n.Type.Value {
+				panic(
+					"cannot initialize variable '" +
+						n.Name.Value +
+						"' of type " +
+						n.Type.Value +
+						"' with value of type " +
+						got.Value,
+				)
+			}
 		}
 
 		a.declare(&Symbol{
