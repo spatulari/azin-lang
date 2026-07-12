@@ -17,6 +17,8 @@ type Symbol struct {
 
 	Function *ast.FuncStmt
 	Struct   *ast.StructStmt
+
+	Inferring bool
 }
 
 func (a *Analyzer) lookup(name string) *Symbol {

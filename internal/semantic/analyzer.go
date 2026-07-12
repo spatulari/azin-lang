@@ -1,9 +1,15 @@
 package semantic
 
-import "github.com/azin-lang/Azin/internal/ast"
+import (
+	"strconv"
+
+	"github.com/azin-lang/Azin/internal/ast"
+)
 
 type Analyzer struct {
 	scopes []*Scope
+
+	currentFunction *ast.FuncStmt
 }
 
 func New() *Analyzer {
@@ -17,9 +23,8 @@ func (a *Analyzer) Analyze(program *ast.Program) error {
 	// Register every top level symbol first
 	for _, stmt := range program.Statements {
 		switch n := stmt.(type) {
-		case *ast.FuncStmt:
-			a.inferFunctionReturnType(n)
 
+		case *ast.FuncStmt:
 			a.declare(&Symbol{
 				Name:     n.Name.Value,
 				Type:     n.ReturnType,
@@ -41,6 +46,15 @@ func (a *Analyzer) Analyze(program *ast.Program) error {
 		a.visitStatement(stmt)
 	}
 
+	for _, stmt := range program.Statements {
+		if fn, ok := stmt.(*ast.FuncStmt); ok {
+			a.inferFunctionReturnType(fn)
+
+			sym := a.lookup(fn.Name.Value)
+			sym.Type = fn.ReturnType
+		}
+	}
+
 	return nil
 }
 
@@ -48,6 +62,12 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 	switch n := stmt.(type) {
 
 	case *ast.FuncStmt:
+		old := a.currentFunction
+		a.currentFunction = n
+		defer func() {
+			a.currentFunction = old
+		}()
+
 		a.pushScope()
 
 		// Register parameters.
@@ -64,6 +84,27 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 		}
 
 		a.popScope()
+
+	case *ast.ReturnStmt:
+		if a.currentFunction == nil {
+			return
+		}
+
+		actual := &ast.Identifier{Value: "unit"}
+		if n.Value != nil {
+			actual = a.inferExprType(n.Value)
+		}
+
+		expected := a.currentFunction.ReturnType
+
+		if expected != nil && actual != nil && expected.Value != actual.Value {
+			panic(
+				"return type mismatch: expected " +
+					expected.Value +
+					", got " +
+					actual.Value,
+			)
+		}
 
 	case *ast.VarStmt:
 		if n.Type == nil {
@@ -95,23 +136,66 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 	}
 }
 
+func (a *Analyzer) findReturnType(stmt ast.Stmt) *ast.Identifier {
+	switch n := stmt.(type) {
+
+	case *ast.ReturnStmt:
+		if n.Value == nil {
+			return &ast.Identifier{Value: "unit"}
+		}
+		return a.inferExprType(n.Value)
+
+	case *ast.IfStmt:
+		for _, s := range n.Then {
+			if t := a.findReturnType(s); t != nil {
+				return t
+			}
+		}
+
+		for _, s := range n.Else {
+			if t := a.findReturnType(s); t != nil {
+				return t
+			}
+		}
+	}
+
+	return nil
+}
+
 func (a *Analyzer) inferFunctionReturnType(fn *ast.FuncStmt) {
+
 	if fn.ReturnType != nil {
 		return
 	}
 
+	sym := a.lookup(fn.Name.Value)
+	if sym != nil {
+		if sym.Inferring {
+			return
+		}
+		sym.Inferring = true
+		defer func() {
+			sym.Inferring = false
+		}()
+	}
+
 	for _, stmt := range fn.Body {
-		if ret, ok := stmt.(*ast.ReturnStmt); ok {
-			if ret.Value == nil {
-				fn.ReturnType = &ast.Identifier{Value: "unit"}
-			} else {
-				fn.ReturnType = a.inferExprType(ret.Value)
+		if typ := a.findReturnType(stmt); typ != nil {
+			fn.ReturnType = typ
+
+			if sym != nil {
+				sym.Type = typ
 			}
+
 			return
 		}
 	}
 
 	fn.ReturnType = &ast.Identifier{Value: "unit"}
+
+	if sym != nil {
+		sym.Type = fn.ReturnType
+	}
 }
 
 func (a *Analyzer) inferExprType(expr ast.Expr) *ast.Identifier {
@@ -135,11 +219,51 @@ func (a *Analyzer) inferExprType(expr ast.Expr) *ast.Identifier {
 		}
 
 	case *ast.CallExpr:
-		if id, ok := n.Callee.(*ast.Identifier); ok {
-			if sym := a.lookup(id.Value); sym != nil && sym.Kind == SymbolFunction {
-				return sym.Type
+		id, ok := n.Callee.(*ast.Identifier)
+		if !ok {
+			return nil
+		}
+
+		sym := a.lookup(id.Value)
+		if sym == nil || sym.Kind != SymbolFunction {
+			panic("unknown function: " + id.Value)
+		}
+
+		if sym.Inferring {
+			return nil
+		}
+
+		if sym.Type == nil {
+			a.inferFunctionReturnType(sym.Function)
+		}
+
+		if len(n.Args) != len(sym.Function.Params) {
+			panic("wrong number of arguments to " + id.Value)
+		}
+
+		for i, arg := range n.Args {
+			got := a.inferExprType(arg)
+			want := sym.Function.Params[i].Type
+
+			if got == nil {
+				continue
+			}
+
+			if got.Value != want.Value {
+				panic(
+					"argument " +
+						strconv.Itoa(i+1) +
+						" of " +
+						id.Value +
+						": expected " +
+						want.Value +
+						", got " +
+						got.Value,
+				)
 			}
 		}
+
+		return sym.Type
 
 	case *ast.BinaryExpr:
 		left := a.inferExprType(n.Left)
