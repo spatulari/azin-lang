@@ -71,7 +71,7 @@ func main() {
 	}
 
 	if *printAST {
-		p := parser.New(string(file.Slice(0, file.Len())), l.Tokenize())
+		p := parser.New(string(file.Slice(0, file.Len())), l.Tokenize(), diag)
 		program := p.ParseProgram()
 
 		ast.Print(program, false, ".")

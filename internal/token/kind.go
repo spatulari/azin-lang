@@ -82,3 +82,108 @@ const (
 
 	Error // error
 )
+
+// DisplayName takes a token as a parameter, and returns a string of the token's display name
+func (k Kind) DisplayName() string {
+	switch k {
+	case KwFn:
+		return "'fn'"
+	case KwDo:
+		return "'do'"
+	case KwVar:
+		return "'var'"
+	case KwMut:
+		return "'mut'"
+	case KwReturn:
+		return "'return'"
+	case KwEnd:
+		return "'end'"
+	case KwChar:
+		return "'char'"
+	case KwInt:
+		return "'int'"
+	case KwUnit:
+		return "'unit'"
+	case KwString:
+		return "'string'"
+	case KwFloat:
+		return "'float'"
+	case KwIf:
+		return "'if'"
+	case KwThen:
+		return "'then'"
+	case KwElse:
+		return "'else'"
+	case KwStruct:
+		return "'struct'"
+	case KwIs:
+		return "'is'"
+	case KwImportC:
+		return "'importC'"
+
+	case Identifier:
+		return "identifier"
+	case IntegerLiteral:
+		return "integer literal"
+	case FloatLiteral:
+		return "float literal"
+	case StringLiteral:
+		return "string literal"
+	case CharacterLiteral:
+		return "character literal"
+
+	case LeftParen:
+		return "'('"
+	case RightParen:
+		return "')'"
+	case LeftBrace:
+		return "'{'"
+	case RightBrace:
+		return "'}'"
+	case LeftBracket:
+		return "'['"
+	case RightBracket:
+		return "']'"
+	case Comma:
+		return "','"
+	case Colon:
+		return "':'"
+	case Semicolon:
+		return "';'"
+	case Dot:
+		return "'.'"
+
+	case Plus:
+		return "'+'"
+	case Minus:
+		return "'-'"
+	case Star:
+		return "'*'"
+	case Slash:
+		return "'/'"
+	case Equal:
+		return "'='"
+	case EqualEqual:
+		return "'=='"
+	case Bang:
+		return "'!'"
+	case BangEqual:
+		return "'!='"
+	case Less:
+		return "'<'"
+	case LessEqual:
+		return "'<='"
+	case Greater:
+		return "'>'"
+	case GreaterEqual:
+		return "'>='"
+
+	case Newline:
+		return "newline"
+	case EOF:
+		return "end of file"
+
+	default:
+		return k.String()
+	}
+}

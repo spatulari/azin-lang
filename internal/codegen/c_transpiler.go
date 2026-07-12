@@ -2,7 +2,7 @@ package codegen
 
 import (
 	"bytes"
-	"strings"
+	"path/filepath"
 
 	"github.com/azin-lang/Azin/internal/ast"
 )
@@ -20,16 +20,24 @@ func New() *Transpiler {
 
 // Transpile transpiles the AST to C code.
 func (t *Transpiler) Transpile(program *ast.Program) string {
+	hasImports := false
+
 	for _, stmt := range program.Statements {
 		if imp, ok := stmt.(*ast.ImportCStmt); ok {
-			// Strip out any surrounding quotes captured by the parser
-			cleanPath := strings.Trim(imp.Path.Value, "\"")
+			header := imp.Path.Value
 
-			// Emit as a standard C header include string
-			t.printf("#include \"%s\"\n", cleanPath)
+			if filepath.Ext(header) == "" {
+				header += ".h"
+			}
+
+			t.printf("#include <%s>\n", header)
+			hasImports = true
 		}
 	}
-	t.newline()
+
+	if hasImports {
+		t.newline()
+	}
 
 	for _, stmt := range program.Statements {
 		if s, ok := stmt.(*ast.StructStmt); ok {

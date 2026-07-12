@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/azin-lang/Azin/internal/ast"
+	"github.com/azin-lang/Azin/internal/diagnostics"
 	"github.com/azin-lang/Azin/internal/token"
 )
 
@@ -13,33 +14,106 @@ type Parser struct {
 	source  string
 	tokens  []token.Token
 	current int
+
+	diag *diagnostics.Engine
 }
 
-func New(source string, tokens []token.Token) *Parser {
-	return &Parser{source: source, tokens: tokens, current: 0}
+func New(source string, tokens []token.Token, diag *diagnostics.Engine) *Parser {
+	return &Parser{
+		source: source,
+		tokens: tokens,
+		diag:   diag,
+	}
+}
+
+func (p *Parser) synchronize() {
+	p.advance() // consume at least a token (no deadlocks I hope)
+
+	for !p.isAtEnd() {
+		if p.previous().Kind == token.Newline ||
+			p.previous().Kind == token.Semicolon {
+			return
+		}
+
+		switch p.peek().Kind {
+		case token.KwFn,
+			token.KwStruct,
+			token.KwVar,
+			token.KwIf,
+			token.KwReturn,
+			token.KwElse,
+			token.KwImportC,
+			token.KwEnd:
+			return
+		}
+
+		p.advance()
+	}
+}
+
+func (p *Parser) error(tok token.Token, format string, args ...any) {
+	p.diag.ReportError(tok.Position, tok.Length, format, args...)
+}
+
+func (p *Parser) reportError(tok token.Token, format string, args ...any) {
+	p.error(tok, format, args...)
 }
 
 func (p *Parser) ParseProgram() *ast.Program {
-	program := &ast.Program{Statements: []ast.Stmt{}}
+	program := &ast.Program{
+		Statements: []ast.Stmt{},
+	}
 
 	for !p.isAtEnd() {
+		before := p.current
+
 		stmt := p.parseStatement()
+
 		if stmt != nil {
 			program.Statements = append(program.Statements, stmt)
-		} else {
+			continue
+		}
+
+		if p.current == before {
 			p.advance()
 		}
+
+		p.synchronize()
 	}
 
 	return program
 }
 
-func (p *Parser) expect(kind token.Kind, message string) token.Token {
+func (p *Parser) Err() error {
+	return p.diag.Err()
+}
+
+func (p *Parser) expect(kind token.Kind, context string) (token.Token, bool) {
 	if p.check(kind) {
-		return p.advance()
+		return p.advance(), true
 	}
 
-	panic(message)
+	got := p.peek()
+
+	if context == "" {
+		p.reportError(
+			got,
+			"expected %s %s, found %s",
+			kind.DisplayName(),
+			context,
+			got.Kind.DisplayName(),
+		)
+	} else {
+		p.reportError(
+			got,
+			"expected %s %s, found %s",
+			kind.DisplayName(),
+			context,
+			got.Kind.DisplayName(),
+		)
+	}
+
+	return got, false
 }
 
 func (p *Parser) parseVar() ast.Stmt {
@@ -51,6 +125,9 @@ func (p *Parser) parseVar() ast.Stmt {
 	}
 
 	name := p.parseIdentifier()
+	if name == nil {
+		return nil
+	}
 
 	var typ *ast.Identifier
 	if p.match(token.Colon) {
@@ -61,11 +138,19 @@ func (p *Parser) parseVar() ast.Stmt {
 
 	if p.match(token.Equal) {
 		value = p.parseExpression(0)
+		if value == nil {
+			return nil
+		}
 	} else if typ == nil {
-		panic("expected '=' or explicit type in variable declaration")
+		p.reportError(
+			p.peek(),
+			"expected '=' or an explicit type in variable declaration",
+		)
 	}
 
-	p.statementEnd()
+	if !p.statementEnd() {
+		return nil
+	}
 
 	return &ast.VarStmt{
 		Token:   tok,
@@ -80,12 +165,15 @@ func (p *Parser) parseImportC() ast.Stmt {
 	tok := p.advance()
 
 	if !p.check(token.StringLiteral) {
-		panic("expected C header after 'importC'")
+		p.reportError(p.peek(), "expected string literal after 'importC'")
+		return nil
 	}
 
 	path := p.parseStringLiteral()
 
-	p.statementEnd()
+	if !p.statementEnd() {
+		return nil
+	}
 
 	return &ast.ImportCStmt{
 		Token: tok,
@@ -93,23 +181,28 @@ func (p *Parser) parseImportC() ast.Stmt {
 	}
 }
 
-func (p *Parser) statementEnd() {
+func (p *Parser) statementEnd() bool {
 	if p.match(token.Semicolon) {
-		return
+		return true
 	}
 
 	if p.match(token.Newline) {
 		p.skipNewlines()
-		return
+		return true
 	}
 
 	if p.check(token.EOF) ||
 		p.check(token.KwEnd) ||
 		p.check(token.KwElse) {
-		return
+		return true
 	}
 
-	panic("expected end of statement")
+	p.reportError(
+		p.peek(),
+		"expected end of statement (newline or ';')",
+	)
+
+	return false
 }
 
 func (p *Parser) parseStatement() ast.Stmt {
@@ -145,12 +238,18 @@ func (p *Parser) parseStatement() ast.Stmt {
 			case *ast.Identifier, *ast.MemberExpr:
 				// valid assignment target
 			default:
-				panic("left side of assignment is not assignable")
+				p.reportError(tok, "left side of assignment is not assignable")
+				return nil
 			}
 
 			value := p.parseExpression(0)
+			if value == nil {
+				return nil
+			}
 
-			p.statementEnd()
+			if !p.statementEnd() {
+				return nil
+			}
 
 			return &ast.AssignmentStmt{
 				Token: tok,
@@ -159,7 +258,9 @@ func (p *Parser) parseStatement() ast.Stmt {
 			}
 		}
 
-		p.statementEnd()
+		if !p.statementEnd() {
+			return nil
+		}
 
 		return &ast.ExpressionStmt{
 			Token:      p.previous(),
@@ -171,8 +272,13 @@ func (p *Parser) parseStatement() ast.Stmt {
 func (p *Parser) parseStruct() ast.Stmt {
 	tok := p.advance()
 	name := p.parseIdentifier()
+	if name == nil {
+		return nil
+	}
 
-	p.expect(token.KwIs, "expected 'is'")
+	if _, ok := p.expect(token.KwIs, "after struct name"); !ok {
+		return nil
+	}
 	p.skipNewlines()
 
 	fields := []*ast.FieldDecl{}
@@ -187,12 +293,22 @@ func (p *Parser) parseStruct() ast.Stmt {
 		mutable := p.match(token.KwMut)
 
 		fName := p.parseIdentifier()
+		if fName == nil {
+			return nil
+		}
 
-		p.expect(token.Colon, "expected ':' after field name")
+		if _, ok := p.expect(token.Colon, "after field name"); !ok {
+			return nil
+		}
 
 		tName := p.parseType()
+		if tName == nil {
+			return nil
+		}
 
-		p.statementEnd()
+		if !p.statementEnd() {
+			return nil
+		}
 
 		fields = append(fields, &ast.FieldDecl{
 			Name:    fName,
@@ -201,7 +317,9 @@ func (p *Parser) parseStruct() ast.Stmt {
 		})
 	}
 
-	p.expect(token.KwEnd, "expected 'end'")
+	if _, ok := p.expect(token.KwEnd, "to close struct"); !ok {
+		return nil
+	}
 
 	return &ast.StructStmt{
 		Token:  tok,
@@ -241,14 +359,24 @@ func (p *Parser) parseType() *ast.Identifier {
 func (p *Parser) parseFunc() ast.Stmt {
 	tok := p.advance()
 	name := p.parseIdentifier()
+	if name == nil {
+		return nil
+	}
 
 	params := []*ast.FieldDecl{}
 
 	if p.match(token.LeftParen) {
 		for !p.isAtEnd() && !p.check(token.RightParen) {
 			pName := p.parseIdentifier()
+			if pName == nil {
+				return nil
+			}
 			p.match(token.Colon)
 			pType := p.parseType()
+
+			if pType == nil {
+				return nil
+			}
 
 			params = append(params, &ast.FieldDecl{
 				Name: pName,
@@ -256,19 +384,28 @@ func (p *Parser) parseFunc() ast.Stmt {
 			})
 
 			if !p.check(token.RightParen) {
-				p.expect(token.Comma, "expected ','")
+				if _, ok := p.expect(token.Comma, "between parameters"); !ok {
+					return nil
+				}
 			}
 		}
 
-		p.expect(token.RightParen, "expected ')'")
+		if _, ok := p.expect(token.RightParen, "after parameter list"); !ok {
+			return nil
+		}
 	}
 	var retType *ast.Identifier
 
 	if p.match(token.Colon) {
 		retType = p.parseType()
+		if retType == nil {
+			return nil
+		}
 	}
 
-	p.expect(token.KwDo, "expected 'do' after function declaration")
+	if _, ok := p.expect(token.KwDo, "after function declaration"); !ok {
+		return nil
+	}
 
 	p.skipNewlines()
 
@@ -287,7 +424,9 @@ func (p *Parser) parseFunc() ast.Stmt {
 		}
 	}
 
-	p.expect(token.KwEnd, "expected 'end'")
+	if _, ok := p.expect(token.KwEnd, "to close function"); !ok {
+		return nil
+	}
 
 	return &ast.FuncStmt{Token: tok, Name: name, Params: params, ReturnType: retType, Body: body}
 }
@@ -303,9 +442,14 @@ func (p *Parser) parseReturn() ast.Stmt {
 		token.EOF,
 	) {
 		value = p.parseExpression(0)
+		if value == nil {
+			return nil
+		}
 	}
 
-	p.statementEnd()
+	if !p.statementEnd() {
+		return nil
+	}
 
 	return &ast.ReturnStmt{
 		Token: tok,
@@ -322,8 +466,13 @@ func (p *Parser) parseIf() ast.Stmt {
 	tok := p.advance() // if
 
 	condition := p.parseExpression(0)
+	if condition == nil {
+		return nil
+	}
 
-	p.expect(token.KwThen, "expected 'then'")
+	if _, ok := p.expect(token.KwThen, "after if condition"); !ok {
+		return nil
+	}
 
 	p.skipNewlines()
 
@@ -363,7 +512,9 @@ func (p *Parser) parseIf() ast.Stmt {
 
 	p.skipNewlines()
 
-	p.expect(token.KwEnd, "expected 'end'")
+	if _, ok := p.expect(token.KwEnd, "to close if statement"); !ok {
+		return nil
+	}
 
 	p.skipNewlines()
 
@@ -381,6 +532,9 @@ func (p *Parser) parseExpression(precedence int) ast.Expr {
 	switch {
 	case p.check(token.Identifier):
 		left = p.parseIdentifier()
+		if left == nil {
+			return nil
+		}
 
 	case p.check(token.IntegerLiteral):
 		left = p.parseIntegerLiteral()
@@ -419,26 +573,48 @@ func (p *Parser) parseExpression(precedence int) ast.Expr {
 
 		switch {
 		case p.check(token.LeftParen):
-			p.advance()
+			if _, ok := p.expect(token.LeftParen, "to start argument list"); !ok {
+				return nil
+			}
 			var args []ast.Expr
 			for !p.check(token.RightParen) {
-				args = append(args, p.parseExpression(0))
+				arg := p.parseExpression(0)
+				if arg == nil {
+					return nil
+				}
+
+				args = append(args, arg)
 				if !p.check(token.RightParen) {
-					p.expect(token.Comma, "expected ','")
+					if _, ok := p.expect(token.Comma, "between arguments"); !ok {
+						return nil
+					}
 				}
 			}
-			p.advance()
+			if _, ok := p.expect(token.RightParen, "to close argument list"); !ok {
+				return nil
+			}
 			left = &ast.CallExpr{Callee: left, Args: args}
 
 		case p.check(token.Dot):
-			p.advance()
+			if _, ok := p.expect(token.Dot, ""); !ok {
+				return nil
+			}
 			prop := p.parseIdentifier()
+			if prop == nil {
+				return nil
+			}
 			left = &ast.MemberExpr{Object: left, Property: prop}
 
 		default:
 			// All binary operators are handled by this
 			op := p.advance()
+
 			right := p.parseExpression(nextPrec)
+
+			if right == nil {
+				return nil
+			}
+
 			left = &ast.BinaryExpr{Left: left, Operator: op, Right: right}
 		}
 	}
@@ -446,7 +622,11 @@ func (p *Parser) parseExpression(precedence int) ast.Expr {
 }
 
 func (p *Parser) parseIdentifier() *ast.Identifier {
-	tok := p.expect(token.Identifier, "expected identifier")
+	tok, ok := p.expect(token.Identifier, "")
+
+	if !ok {
+		return nil
+	}
 
 	start := tok.Position.Offset
 	end := start + tok.Length
@@ -508,7 +688,8 @@ func (p *Parser) parseStringLiteral() *ast.StringLiteral {
 
 	value, err := strconv.Unquote(raw)
 	if err != nil {
-		panic(err)
+		p.reportError(tok, "invalid string literal: %v", err)
+		return nil
 	}
 
 	return &ast.StringLiteral{
@@ -527,7 +708,8 @@ func (p *Parser) parseCharacterLiteral() *ast.CharacterLiteral {
 
 	value, _, _, err := strconv.UnquoteChar(raw[1:len(raw)-1], '\'')
 	if err != nil {
-		panic(err)
+		p.reportError(tok, "invalid character literal: %v", err)
+		return nil
 	}
 
 	return &ast.CharacterLiteral{
@@ -565,9 +747,6 @@ func (p *Parser) advance() token.Token {
 }
 
 func (p *Parser) check(kind token.Kind) bool {
-	if p.isAtEnd() {
-		return false
-	}
 	return p.peek().Kind == kind
 }
 
