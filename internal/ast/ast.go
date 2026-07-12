@@ -163,12 +163,12 @@ func (*StringLiteral) exprNode() {}
 
 // CallExpr represents a function call.
 type CallExpr struct {
-	Function *Identifier
-	Args     []Expr
+	Callee Expr
+	Args   []Expr
 }
 
 func (c *CallExpr) TokenLiteral() string {
-	return c.Function.TokenLiteral()
+	return c.Callee.TokenLiteral()
 }
 
 func (*CallExpr) exprNode() {}
