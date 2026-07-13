@@ -71,6 +71,10 @@ func (e *Engine) Err() error {
 
 // Formats all diagnostics into a readable string.
 func (e *Engine) Error() string {
+	if len(e.diagnostics) == 0 {
+		return ""
+	}
+
 	var b strings.Builder
 
 	for i, d := range e.diagnostics {
