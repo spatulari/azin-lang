@@ -1,6 +1,5 @@
 package token
 
-//// go:generate go run golang.org/x/tools/cmd/stringer -type=Kind -linecomment
 //go:generate go tool stringer -type=Kind -linecomment
 
 // Kind is the set of lexical token types.
@@ -23,6 +22,8 @@ const (
 	KwEnd     // kw_end
 	KwChar    // kw_char
 	KwInt     // kw_int
+	KwBool    // kw_bool
+	KwNull    // kw_null
 	KwUnit    // kw_unit
 	KwString  // kw_string
 	KwFloat   // kw_float
