@@ -137,7 +137,8 @@ func Compile(file *source.File, outputPath string, emitC bool) error {
 		return err
 	}
 
-	analyzer := semantic.New()
+	diag := diagnostics.New(file)
+	analyzer := semantic.New(diag)
 
 	if err := analyzer.Analyze(program); err != nil {
 		return err
