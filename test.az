@@ -12,6 +12,10 @@ fn distance(a: Point, b: Point): int do
 end
 
 fn main: int do
-    printf("hello world\n");
+    var mut p1: Point
+    var mut p2: Point
+    p1.x = 10; p1.y = 0x04
+    p2.x = 0b01001; p2.y = 5
+    printf("Manhattan distance between (%d, %d) and (%d, %d) is %d\n", p1.x, p1.y, p2.x, p2.y, distance(p1, p2));
     return 0;
 end
