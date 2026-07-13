@@ -70,10 +70,7 @@ func main() {
 		return
 	}
 
-	p := parser.New(string(file.Slice(0, file.Len())), tokens, diag)
-	program := p.ParseProgram()
-
-	parseErr := diag.Err()
+	program, parseErr := parser.Parse(string(file.Slice(0, file.Len())), tokens, diag)
 
 	if *printAST {
 		if err := ast.PrintJSON(program); err != nil {
