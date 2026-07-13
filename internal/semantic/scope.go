@@ -1,5 +1,6 @@
 package semantic
 
+// Scope represents a lexical scope in the source code. It contains a reference to its parent scope and a map of symbols defined within that scope.
 type Scope struct {
 	Parent  *Scope
 	Symbols map[string]*Symbol
