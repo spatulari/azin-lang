@@ -96,8 +96,7 @@ func (e *Engine) Error() string {
 		line, column := e.file.LineColumn(d.Position.Offset)
 		src := e.file.Line(line)
 
-		_, _ = fmt.Fprintf(&b, "%s: %s\n", d.Kind, d.Message)
-		_, _ = fmt.Fprintf(&b, " --> %s:%d:%d\n", e.file.Name(), line, column)
+		_, _ = fmt.Fprintf(&b, "%s:%d:%d: %s: %s\n", e.file.Name(), line, column, d.Kind, d.Message)
 
 		_, _ = fmt.Fprintf(&b, "%*s |\n", gutter, "")
 		_, _ = fmt.Fprintf(&b, "%*d | %s\n", gutter, line, src)
