@@ -207,7 +207,11 @@ func (p *Parser) parseStatement() ast.Stmt {
 		stmt = p.parseExpressionOrAssignment()
 	}
 
-	// Synchronize if we encountered a bad node to avoid cascading errors
+	if stmt == nil {
+		p.synchronize()
+		return &ast.BadStmt{Token: p.peek()}
+	}
+
 	if _, ok := stmt.(*ast.BadStmt); ok {
 		p.synchronize()
 	}
@@ -217,21 +221,25 @@ func (p *Parser) parseStatement() ast.Stmt {
 func (p *Parser) parseExpressionOrAssignment() ast.Stmt {
 	expr := p.parseExpression(0)
 
+	if _, ok := expr.(*ast.BadExpr); ok {
+		return &ast.BadStmt{Token: p.peek()}
+	}
+
 	if p.check(token.Equal) {
 		tok := p.advance()
 
 		switch expr.(type) {
 		case *ast.Identifier, *ast.MemberExpr:
 			// valid assignment target
-		case *ast.BadExpr:
-			// Already bad, propagate as a bad statement
-			return &ast.BadStmt{Token: tok}
 		default:
 			p.reportError(tok, "left side of assignment is not assignable")
 			return &ast.BadStmt{Token: tok}
 		}
 
 		value := p.parseExpression(0)
+		if _, ok := value.(*ast.BadExpr); ok {
+			return &ast.BadStmt{Token: tok}
+		}
 
 		if !p.statementEnd() {
 			return &ast.BadStmt{Token: tok}
@@ -258,11 +266,10 @@ func (p *Parser) parseStruct() ast.Stmt {
 	tok := p.advance()
 	name := p.parseIdentifier()
 	if name == nil {
-		return nil
+		return &ast.BadStmt{Token: tok}
 	}
-
 	if _, ok := p.expect(token.KwIs, "after struct name"); !ok {
-		return nil
+		return &ast.BadStmt{Token: tok}
 	}
 	p.skipNewlines()
 
@@ -278,20 +285,20 @@ func (p *Parser) parseStruct() ast.Stmt {
 		mutable := p.match(token.KwMut)
 		fName := p.parseIdentifier()
 		if fName == nil {
-			return nil
+			return &ast.BadStmt{Token: tok}
 		}
 
 		if _, ok := p.expect(token.Colon, "after field name"); !ok {
-			return nil
+			return &ast.BadStmt{Token: tok}
 		}
 
 		tName := p.parseType()
 		if tName == nil {
-			return nil
+			return &ast.BadStmt{Token: tok}
 		}
 
 		if !p.statementEnd() {
-			return nil
+			return &ast.BadStmt{Token: tok}
 		}
 
 		fields = append(fields, &ast.FieldDecl{
@@ -302,7 +309,7 @@ func (p *Parser) parseStruct() ast.Stmt {
 	}
 
 	if _, ok := p.expect(token.KwEnd, "to close struct"); !ok {
-		return nil
+		return &ast.BadStmt{Token: tok}
 	}
 
 	return &ast.StructStmt{
@@ -430,7 +437,10 @@ func (p *Parser) parseIf() ast.Stmt {
 		if p.isAtEnd() || p.checkAny(token.KwElse, token.KwEnd) {
 			break
 		}
-		thenBody = append(thenBody, p.parseStatement())
+		stmt := p.parseStatement()
+		if stmt != nil {
+			thenBody = append(thenBody, stmt)
+		}
 	}
 
 	var elseBody []ast.Stmt
@@ -441,7 +451,10 @@ func (p *Parser) parseIf() ast.Stmt {
 			if p.isAtEnd() || p.check(token.KwEnd) {
 				break
 			}
-			elseBody = append(elseBody, p.parseStatement())
+			stmt := p.parseStatement()
+			if stmt != nil {
+				elseBody = append(elseBody, stmt)
+			}
 		}
 	}
 
