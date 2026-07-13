@@ -53,7 +53,15 @@ func (p *Parser) synchronize() {
 }
 
 func (p *Parser) lexeme(tok token.Token) string {
-	return p.source[tok.Position.Offset : tok.Position.Offset+tok.Length]
+	start := int(tok.Position.Offset)
+	end := start + int(tok.Length)
+	if end > len(p.source) {
+		end = len(p.source)
+	}
+	if start > end {
+		return ""
+	}
+	return p.source[start:end]
 }
 
 func (p *Parser) reportError(tok token.Token, format string, args ...any) {
