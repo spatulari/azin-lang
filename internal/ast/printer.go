@@ -28,21 +28,18 @@ func PrintDebugTree(node Node) {
 }
 
 func ExportTree(node Node, path string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	// newNormalPrinter(f, false).Print(node)
-	return nil
+	return export(path, func(f *os.File) {
+		// newNormalPrinter(f, false).Print(node)
+	})
 }
 
 func ExportDebugTree(node Node, path string) error {
+	return export(path, func(f *os.File) {
+		newDebugPrinter(f, false).Print(node)
+	})
+}
+
+func export(path string, fn func(*os.File)) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -53,20 +50,24 @@ func ExportDebugTree(node Node, path string) error {
 	}
 	defer f.Close()
 
-	newDebugPrinter(f, false).Print(node)
+	fn(f)
+
 	return nil
 }
 
 func unwrap(v reflect.Value) reflect.Value {
-	for v.IsValid() &&
-		(v.Kind() == reflect.Pointer ||
-			v.Kind() == reflect.Interface) {
+	for v.IsValid() {
+		switch v.Kind() {
+		case reflect.Pointer, reflect.Interface:
+			if v.IsNil() {
+				return reflect.Value{}
+			}
 
-		if v.IsNil() {
-			return reflect.Value{}
+			v = v.Elem()
+
+		default:
+			return v
 		}
-
-		v = v.Elem()
 	}
 
 	return v
@@ -96,7 +97,6 @@ func nodeOf(v reflect.Value) Node {
 
 func compact(v reflect.Value) (string, bool) {
 	n := nodeOf(v)
-
 	if n == nil {
 		return "", false
 	}
@@ -109,33 +109,31 @@ func compact(v reflect.Value) (string, bool) {
 	case *StringLiteral:
 		return strconv.Quote(n.Value), true
 
+	case *CharacterLiteral:
+		return strconv.QuoteRune(n.Value), true
+
 	case *IntegerLiteral:
-		return strconv.FormatInt(
-			n.Value,
-			10,
-		), true
+		return strconv.FormatInt(n.Value, 10), true
 
 	case *FloatLiteral:
-		return strconv.FormatFloat(
-			n.Value,
-			'g',
-			-1,
-			64,
-		), true
+		return strconv.FormatFloat(n.Value, 'g', -1, 64), true
 
 	case *BooleanLiteral:
-		return strconv.FormatBool(n.Value), true
+		if n.Value {
+			return "✅", true
+		}
+		return "❌", true
 
 	case *FieldDecl:
-		if n.Type != nil {
-			return fmt.Sprintf(
-				"%s: %s",
-				n.Name.Value,
-				n.Type.Label(),
-			), true
+		if n.Type == nil {
+			return n.Name.Value, true
 		}
 
-		return n.Name.Value, true
+		return fmt.Sprintf(
+			"%s: %s",
+			n.Name.Value,
+			n.Type.Label(),
+		), true
 	}
 
 	return "", false
@@ -143,14 +141,11 @@ func compact(v reflect.Value) (string, bool) {
 
 func shouldSkipField(name string) bool {
 	switch name {
-	case
-		"Token",
-		"Position":
-
+	case "Token", "Position":
 		return true
+	default:
+		return false
 	}
-
-	return false
 }
 
 func skipFalseOrEmpty(v reflect.Value) bool {
@@ -161,9 +156,11 @@ func skipFalseOrEmpty(v reflect.Value) bool {
 	}
 
 	switch v.Kind() {
-
 	case reflect.Slice:
 		return v.Len() == 0
+
+	case reflect.Bool:
+		return !v.Bool()
 	}
 
 	return false
@@ -181,55 +178,92 @@ func isInlineField(name string) bool {
 		"Callee",
 		"Path",
 		"Value":
-
 		return true
 	}
 
 	return false
 }
 
-func isTransparentSlice(fieldName string) bool {
-	// Add Then, Else, and Body to the list of fields to flatten
-	return fieldName == "Body" || fieldName == "Then" || fieldName == "Else"
+func isTransparentSlice(name string) bool {
+	switch name {
+	case
+		"Body",
+		"Then",
+		"Else",
+		"Statements",
+		"Params",
+		"Fields",
+		"Args":
+		return true
+	}
+
+	return false
 }
 
-func meaningfulFields(
-	v reflect.Value,
-) []reflect.StructField {
-
+func meaningfulFields(v reflect.Value) []reflect.StructField {
 	v = unwrap(v)
 
-	if !v.IsValid() ||
-		v.Kind() != reflect.Struct {
-
+	if !v.IsValid() || v.Kind() != reflect.Struct {
 		return nil
 	}
 
-	var result []reflect.StructField
-
 	t := v.Type()
+	fields := make([]reflect.StructField, 0, v.NumField())
 
 	for i := 0; i < v.NumField(); i++ {
-
 		sf := t.Field(i)
 
-		if !sf.IsExported() ||
-			shouldSkipField(sf.Name) {
-
+		if !sf.IsExported() || shouldSkipField(sf.Name) {
 			continue
 		}
 
-		value := v.Field(i)
-
-		if skipFalseOrEmpty(value) {
+		if skipFalseOrEmpty(v.Field(i)) {
 			continue
 		}
 
-		result = append(
-			result,
-			sf,
-		)
+		fields = append(fields, sf)
 	}
 
-	return result
+	return fields
+}
+
+func primitive(v reflect.Value) (string, bool) {
+	v = unwrap(v)
+
+	if !v.IsValid() {
+		return "", false
+	}
+
+	switch v.Kind() {
+
+	case reflect.String:
+		return strconv.Quote(v.String()), true
+
+	case reflect.Bool:
+		if v.Bool() {
+			return "✅", true
+		}
+		return "❌", true
+
+	case reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
+		reflect.Int64:
+		return strconv.FormatInt(v.Int(), 10), true
+
+	case reflect.Uint,
+		reflect.Uint8,
+		reflect.Uint16,
+		reflect.Uint32,
+		reflect.Uint64,
+		reflect.Uintptr:
+		return strconv.FormatUint(v.Uint(), 10), true
+
+	case reflect.Float32,
+		reflect.Float64:
+		return strconv.FormatFloat(v.Float(), 'g', -1, 64), true
+	}
+
+	return "", false
 }
