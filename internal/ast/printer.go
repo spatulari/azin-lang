@@ -20,7 +20,7 @@ var (
 )
 
 func PrintTree(node Node) {
-	//newNormalPrinter(os.Stdout, true).Print(node)
+	// newNormalPrinter(os.Stdout, true).Print(node)
 }
 
 func PrintDebugTree(node Node) {
@@ -38,7 +38,7 @@ func ExportTree(node Node, path string) error {
 	}
 	defer f.Close()
 
-	//newNormalPrinter(f, false).Print(node)
+	// newNormalPrinter(f, false).Print(node)
 	return nil
 }
 
@@ -188,19 +188,9 @@ func isInlineField(name string) bool {
 	return false
 }
 
-func isTransparentSlice(name string) bool {
-	switch name {
-	case
-		"Statements",
-		"Body",
-		"Params",
-		"Fields",
-		"Args":
-
-		return true
-	}
-
-	return false
+func isTransparentSlice(fieldName string) bool {
+	// Add Then, Else, and Body to the list of fields to flatten
+	return fieldName == "Body" || fieldName == "Then" || fieldName == "Else"
 }
 
 func meaningfulFields(

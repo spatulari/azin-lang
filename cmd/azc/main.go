@@ -75,11 +75,7 @@ func main() {
 
 	if *printAST {
 		// TODO: hook this up to *output and use the Export*Tree family of funcs
-		if *debug {
-			ast.PrintDebugTree(program)
-		} else {
-			ast.PrintTree(program)
-		}
+		ast.PrintDebugTree(program)
 		return
 	}
 
