@@ -5,7 +5,6 @@ import (
 	"unicode/utf8"
 )
 
-// isIdentifierStart reports whether a rune is valid as the first character of an identifier.
 func isIdentifierStart(r rune) bool {
 	if 'a' <= r && r <= 'z' || 'A' <= r && r <= 'Z' || r == '_' {
 		return true
@@ -13,7 +12,6 @@ func isIdentifierStart(r rune) bool {
 	return r >= utf8.RuneSelf && unicode.IsLetter(r)
 }
 
-// isIdentifierContinue reports whether a rune is valid within an identifier.
 func isIdentifierContinue(r rune) bool {
 	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsMark(r)
 }

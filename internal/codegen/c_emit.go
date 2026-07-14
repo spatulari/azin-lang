@@ -50,6 +50,9 @@ func emitType(name string) string {
 	case "string":
 		return "const char *"
 
+	case "bool":
+		return "bool"
+
 	default:
 		// assume it's a user defined type
 		// TODO: check if it is, instead of assuming and letting C handle it

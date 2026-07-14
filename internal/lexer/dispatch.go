@@ -2,7 +2,6 @@ package lexer
 
 import "github.com/azin-lang/Azin/internal/token"
 
-// nextToken scans and returns the next token from the source file.
 func (l *Lexer) nextToken() token.Token {
 	l.skipTrivia()
 
@@ -11,7 +10,7 @@ func (l *Lexer) nextToken() token.Token {
 	}
 
 	start := l.pos()
-	ch, size := l.advance()
+	ch, _ := l.advance()
 
 	switch {
 	case ch == '\n':
@@ -39,6 +38,6 @@ func (l *Lexer) nextToken() token.Token {
 		return l.lexPunctuation(ch, start)
 
 	default:
-		return l.lexOperator(ch, size, start)
+		return l.lexOperator(ch, start)
 	}
 }

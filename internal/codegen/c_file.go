@@ -7,7 +7,10 @@ func (t *Transpiler) write(s string) {
 }
 
 func (t *Transpiler) printf(format string, args ...any) {
-	fmt.Fprintf(&t.buf, format, args...)
+	_, err := fmt.Fprintf(&t.buf, format, args...)
+	if err != nil {
+		return
+	}
 }
 
 func (t *Transpiler) newline() {

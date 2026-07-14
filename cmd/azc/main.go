@@ -21,6 +21,7 @@ var (
 	debug           = flag.Bool("debug", false, "Enable debug output")
 	printTokens     = flag.Bool("print-tokens", false, "Print lexer tokens")
 	printAST        = flag.Bool("print-ast", false, "Print the parsed AST")
+	optimization    = flag.String("O", "0", "Optimization level (0,1,2,3,s,z) (default \"0\")")
 	output          = flag.String("o", "", "Output file")
 	ignoreExtension = flag.Bool("ignore-extension", false, "Ignore source file extension")
 	version         = flag.Bool("version", false, "Print compiler version")
@@ -56,29 +57,40 @@ func main() {
 	file := source.New(filename, data)
 
 	diag := diagnostics.New(file)
-
 	l := lexer.New(file, diag)
+	tokens := l.Tokenize()
 
 	if err := diag.Err(); err != nil {
 		fatal(err)
 	}
 
 	if *printTokens {
-		for tok := range l.Tokens() {
+		for _, tok := range tokens {
 			fmt.Println(formatToken(file, tok))
 		}
 		return
 	}
 
-	if *printAST {
-		p := parser.New(string(file.Slice(0, file.Len())), l.Tokenize(), diag)
-		program := p.ParseProgram()
+	program, parseErr := parser.Parse(string(file.Slice(0, file.Len())), tokens, diag)
 
-		ast.Print(program, false, ".")
+	if *printAST {
+		// TODO: hook this up to *output and use the Export*Tree family of funcs
+		ast.PrintDebugTree(program)
 		return
 	}
 
-	err := compiler.Compile(file, *output, *emitC)
+	if parseErr != nil {
+		fatal(parseErr)
+	}
+
+	opts := compiler.Options{
+		Output:       *output,
+		EmitC:        *emitC,
+		Optimization: *optimization,
+		Debug:        *debug,
+	}
+
+	err := compiler.Compile(file, *output, opts)
 	if err != nil {
 		fatal(err)
 	}
