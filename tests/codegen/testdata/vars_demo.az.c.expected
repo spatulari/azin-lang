@@ -1,0 +1,9 @@
+#include <stdbool.h>
+
+int main() {
+    int x = 42;
+    const const char * name = "azin";
+    const bool flag = true;
+    x = 99;
+    return x;
+}
