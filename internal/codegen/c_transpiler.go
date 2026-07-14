@@ -7,13 +7,13 @@ import (
 	"github.com/azin-lang/Azin/internal/ast"
 )
 
-// the Transpiler struct is responsible for transpiling the AST to C code.
+// Transpiler the Transpiler struct is responsible for transpiling the AST to C code.
 type Transpiler struct {
 	buf    bytes.Buffer
 	indent int
 }
 
-// create a new Transpiler.
+// New create a new Transpiler.
 func New() *Transpiler {
 	return &Transpiler{}
 }

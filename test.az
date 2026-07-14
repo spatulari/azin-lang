@@ -1,27 +1,17 @@
-importc "stdio"
-importc "stdlib"
-importc "math"
+importc "stdio.h"
+importc "stdlib.h"
+importc "math.h"
 
 struct Point is
     x: int;
     y: int;
 end
 
-fn distance(a: Point, b: Point): float do
+fn distance(a: Point, b: Point): int do
     return abs(a.x - b.x) + abs(a.y - b.y);
 end
 
-fn foo(a: int): string do
-    return 10
-end
-
 fn main: int do
-    var mut p1: Point
-    var mut p2: Point
-    p1.x = 10; p1.y = 0x04
-    p2.x = 0b01001; p2.y = 5
-    var x: int = foo(20)
-    printf("Manhattan distance between (%d, %d) and (%d, %d) is %d\n", p1.x, p1.y, p2.x, p2.y, distance(p1, p2));
-    printf("%d", x);
+    printf("hello world\n");
     return 0;
 end

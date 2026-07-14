@@ -174,11 +174,11 @@ func parseSource(file *source.File) (*ast.Program, error) {
 		return nil, err
 	}
 
-	parser := parser.New(string(file.Slice(0, file.Len())), tokens, diag)
+	sourceParser := parser.New(string(file.Slice(0, file.Len())), tokens, diag)
 
-	program := parser.ParseProgram()
+	program := sourceParser.ParseProgram()
 
-	if err := parser.Err(); err != nil {
+	if err := sourceParser.Err(); err != nil {
 		return nil, err
 	}
 
@@ -212,7 +212,12 @@ func writeToTempFile(content string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp source: %w", err)
 	}
-	defer f.Close()
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
+
+		}
+	}(f)
 
 	if _, err := f.WriteString(content); err != nil {
 		return "", fmt.Errorf("failed to write temp source: %w", err)

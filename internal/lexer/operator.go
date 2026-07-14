@@ -2,7 +2,7 @@ package lexer
 
 import "github.com/azin-lang/Azin/internal/token"
 
-func (l *Lexer) lexOperator(ch rune, size uint32, start token.Position) token.Token {
+func (l *Lexer) lexOperator(ch rune, start token.Position) token.Token {
 	switch ch {
 	case '+':
 		return l.lexPlus(start)
