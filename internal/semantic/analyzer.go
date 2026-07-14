@@ -1,8 +1,6 @@
 package semantic
 
 import (
-	"fmt"
-
 	"github.com/azin-lang/Azin/internal/ast"
 	"github.com/azin-lang/Azin/internal/diagnostics"
 )
@@ -17,6 +15,8 @@ type Analyzer struct {
 
 	currentFunction *ast.FuncStmt
 	diag            *diagnostics.Engine
+
+	loopDepth int
 }
 
 // New creates a new Analyzer instance with the provided diagnostics engine.
@@ -190,13 +190,20 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 		a.popScope()
 
 	case *ast.LoopStmt:
+		a.loopDepth++
+		defer func() { a.loopDepth-- }()
+
 		a.pushScope()
+		defer a.popScope()
 
 		for _, stmt := range n.Body {
 			a.visitStatement(stmt)
 		}
 
-		a.popScope()
+	case *ast.StopStmt:
+		if a.loopDepth == 0 {
+			a.errorf(n, "'stop' can only be used inside a loop")
+		}
 
 	case *ast.AssignmentStmt:
 		switch left := n.Left.(type) {
@@ -220,18 +227,6 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 			}
 
 			got := a.inferExprType(n.Value)
-
-			fmt.Printf(
-				"assign: lhs=%q rhs=%q (%T)\n",
-				sym.Type.Value,
-				func() string {
-					if got == nil {
-						return "<nil>"
-					}
-					return got.Value
-				}(),
-				n.Value,
-			)
 
 			if got != nil && sym.Type != nil && got.Value != sym.Type.Value {
 				a.errorf(

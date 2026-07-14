@@ -7,25 +7,31 @@ import (
 
 func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{
-		Statements: make([]ast.Stmt, 0, len(p.tokens)/4), // pre-allocate some capacity
+		Statements: make([]ast.Stmt, 0, len(p.tokens)/4),
 	}
 
 	for !p.isAtEnd() {
 		before := p.current
-		if stmt := p.parseStatement(); stmt != nil {
+
+		stmt := p.parseStatement()
+
+		// Reached EOF while skipping trailing newlines
+		if stmt == nil && p.isAtEnd() {
+			break
+		}
+
+		if stmt != nil {
 			program.Statements = append(program.Statements, stmt)
 		}
 
-		// If the parser didn't advance, force it to avoid infinite loops
+		// Only recover if we're genuinely stuck
 		if p.current == before {
-			p.advance()
 			p.synchronize()
 		}
 	}
 
 	return program
 }
-
 func (p *Parser) parseVar() ast.Stmt {
 	tok := p.advance()
 	mutable := p.match(token.KwMut)
@@ -79,6 +85,10 @@ func (p *Parser) parseImportC() ast.Stmt {
 func (p *Parser) parseStatement() ast.Stmt {
 	p.skipNewlines()
 
+	if p.isAtEnd() {
+		return nil
+	}
+
 	var stmt ast.Stmt
 	switch {
 	case p.check(token.KwVar):
@@ -95,6 +105,8 @@ func (p *Parser) parseStatement() ast.Stmt {
 		stmt = p.parseImportC()
 	case p.check(token.KwLoop):
 		stmt = p.parseLoop()
+	case p.check(token.KwStop):
+		stmt = p.parseStop()
 	default:
 		stmt = p.parseExpressionOrAssignment()
 	}
@@ -379,10 +391,20 @@ func (p *Parser) parseFieldDecl(allowMut bool) *ast.FieldDecl {
 	}
 }
 
+func (p *Parser) parseStop() ast.Stmt {
+	tok := p.advance()
+	p.consumeStatementEnd()
+
+	return &ast.StopStmt{
+		Token: tok,
+	}
+}
+
 func (p *Parser) parseLoop() ast.Stmt {
 	tok := p.advance()
 
 	body := p.parseBlock(token.KwEnd)
+
 	p.expect(token.KwEnd, "to close loop")
 
 	return &ast.LoopStmt{
