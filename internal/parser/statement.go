@@ -378,3 +378,15 @@ func (p *Parser) parseFieldDecl(allowMut bool) *ast.FieldDecl {
 		Mutable: mutable,
 	}
 }
+
+func (p *Parser) parseLoop() ast.Stmt {
+	tok := p.advance()
+
+	body := p.parseBlock(token.KwEnd)
+	p.expect(token.KwEnd, "to close loop")
+
+	return &ast.LoopStmt{
+		Token: tok,
+		Body:  body,
+	}
+}
