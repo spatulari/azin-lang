@@ -1,6 +1,7 @@
 package source_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/azin-lang/Azin/internal/source"
@@ -118,8 +119,9 @@ func TestBaseAndExt(t *testing.T) {
 	if f.Ext() != ".az" {
 		t.Errorf("Ext() = %q, want %q", f.Ext(), ".az")
 	}
-	if f.Dir() != "/path/to" {
-		t.Errorf("Dir() = %q, want %q", f.Dir(), "/path/to")
+	wantDir := filepath.FromSlash("/path/to")
+	if f.Dir() != wantDir {
+		t.Errorf("Dir() = %q, want %q", f.Dir(), wantDir)
 	}
 }
 

@@ -268,8 +268,9 @@ func TestCodegenSnapshot(t *testing.T) {
 				t.Fatalf("golden file %s: %v", golden, err)
 			}
 
-			if got != strings.TrimSpace(string(want)) {
-				t.Errorf("C output mismatch for %s\n--- got:\n%s\n--- want:\n%s", name, got, string(want))
+			wantStr := strings.ReplaceAll(string(want), "\r\n", "\n")
+			if got != strings.TrimSpace(wantStr) {
+				t.Errorf("C output mismatch for %s\n--- got:\n%s\n--- want:\n%s", name, got, wantStr)
 			}
 		})
 	}

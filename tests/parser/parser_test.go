@@ -438,8 +438,9 @@ func TestParserSnapshot(t *testing.T) {
 				t.Fatalf("golden file %s: %v", golden, err)
 			}
 
-			if strings.TrimSpace(got) != strings.TrimSpace(string(want)) {
-				t.Errorf("AST mismatch for %s\n--- got:\n%s\n--- want:\n%s", name, got, string(want))
+			wantStr := strings.ReplaceAll(string(want), "\r\n", "\n")
+			if strings.TrimSpace(got) != strings.TrimSpace(wantStr) {
+				t.Errorf("AST mismatch for %s\n--- got:\n%s\n--- want:\n%s", name, got, wantStr)
 			}
 		})
 	}
