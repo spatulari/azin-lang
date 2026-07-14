@@ -185,6 +185,21 @@ type IfStmt struct {
 func (*IfStmt) stmtNode()              {}
 func (i *IfStmt) TokenLiteral() string { return i.Token.Kind.String() }
 func (i *IfStmt) Pos() token.Position  { return i.Token.Position }
+func (*IfStmt) Label() string {
+	return "if"
+}
+
+type LoopStmt struct {
+	Token token.Token // loop
+	Body  []Stmt
+}
+
+func (*LoopStmt) stmtNode()              {}
+func (l *LoopStmt) TokenLiteral() string { return l.Token.Kind.String() }
+func (l *LoopStmt) Pos() token.Position  { return l.Token.Position }
+func (*LoopStmt) Label() string {
+	return "loop"
+}
 
 type ImportCStmt struct {
 	Token token.Token
@@ -299,6 +314,23 @@ type CharacterLiteral struct {
 func (*CharacterLiteral) exprNode()              {}
 func (c *CharacterLiteral) TokenLiteral() string { return string(c.Value) }
 func (c *CharacterLiteral) Pos() token.Position  { return c.Token.Position }
+func (c *CharacterLiteral) Label() string {
+	return strconv.QuoteRune(c.Value)
+}
+
+type BooleanLiteral struct {
+	Token token.Token
+	Value bool
+}
+
+func (*BooleanLiteral) exprNode() {}
+func (b *BooleanLiteral) TokenLiteral() string {
+	return strconv.FormatBool(b.Value)
+}
+func (b *BooleanLiteral) Pos() token.Position { return b.Token.Position }
+func (b *BooleanLiteral) Label() string {
+	return strconv.FormatBool(b.Value)
+}
 
 type CallExpr struct {
 	Callee Expr
