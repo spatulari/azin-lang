@@ -9,6 +9,7 @@ const (
 	SymbolVariable SymbolKind = iota // SymbolVariable represents a variable symbol.
 	SymbolFunction                   // SymbolFunction represents a function symbol.
 	SymbolStruct                     // SymbolStruct represents a struct symbol.
+	SymbolEnum                       // SymbolEnum represents an enum symbol.
 )
 
 // Symbol represents a symbol in the semantic analysis phase.
@@ -20,6 +21,7 @@ type Symbol struct {
 
 	Function *ast.FuncStmt
 	Struct   *ast.StructStmt
+	Enum     *ast.EnumStmt
 
 	Inferring bool
 }

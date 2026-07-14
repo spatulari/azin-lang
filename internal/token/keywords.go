@@ -23,4 +23,5 @@ var Keywords = map[string]Kind{
 	"loop":    KwLoop,
 	"stop":    KwStop,
 	"null":    KwNull,
+	"enum":    KwEnum,
 }
