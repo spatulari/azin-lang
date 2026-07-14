@@ -36,6 +36,11 @@ func (t *Transpiler) compileStatement(stmt ast.Stmt) {
 	case *ast.LoopStmt:
 		t.compileLoop(n)
 
+	case *ast.StopStmt:
+		t.writeIndent()
+		t.write("break;")
+		t.newline()
+
 	case *ast.FuncStmt:
 		t.compileFunc(n)
 

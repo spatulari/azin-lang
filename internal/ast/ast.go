@@ -201,6 +201,17 @@ func (*LoopStmt) Label() string {
 	return "loop"
 }
 
+type StopStmt struct {
+	Token token.Token // stop
+}
+
+func (*StopStmt) stmtNode()              {}
+func (s *StopStmt) TokenLiteral() string { return s.Token.Kind.String() }
+func (s *StopStmt) Pos() token.Position  { return s.Token.Position }
+func (*StopStmt) Label() string {
+	return "stop"
+}
+
 type ImportCStmt struct {
 	Token token.Token
 	Path  *StringLiteral

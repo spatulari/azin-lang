@@ -34,6 +34,7 @@ const (
 	KwIs      // kw_is
 	KwImportC // kw_import
 	KwLoop    // kw_loop
+	KwStop    // kw_stop
 
 	Plus           // plus
 	Minus          // minus

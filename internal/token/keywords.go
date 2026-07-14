@@ -21,5 +21,6 @@ var Keywords = map[string]Kind{
 	"is":      KwIs,
 	"importc": KwImportC,
 	"loop":    KwLoop,
+	"stop":    KwStop,
 	"null":    KwNull,
 }
