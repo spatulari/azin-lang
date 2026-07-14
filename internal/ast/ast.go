@@ -2,6 +2,7 @@ package ast
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/azin-lang/Azin/internal/token"
 )
@@ -10,6 +11,7 @@ import (
 type Node interface {
 	TokenLiteral() string
 	Pos() token.Position
+	Label() string
 }
 
 // Expr represents an expression node.
@@ -43,6 +45,10 @@ func (p *Program) Pos() token.Position {
 	return p.Statements[0].Pos()
 }
 
+func (p *Program) Label() string {
+	return "Program"
+}
+
 // Bad nodes
 
 type BadExpr struct {
@@ -52,6 +58,7 @@ type BadExpr struct {
 func (*BadExpr) exprNode()              {}
 func (b *BadExpr) TokenLiteral() string { return b.Token.Kind.String() }
 func (b *BadExpr) Pos() token.Position  { return b.Token.Position }
+func (*BadExpr) Label() string          { return "BadExpr" }
 
 type BadStmt struct {
 	Token token.Token
@@ -60,6 +67,7 @@ type BadStmt struct {
 func (*BadStmt) stmtNode()              {}
 func (b *BadStmt) TokenLiteral() string { return b.Token.Kind.String() }
 func (b *BadStmt) Pos() token.Position  { return b.Token.Position }
+func (*BadStmt) Label() string          { return "BadStmt" }
 
 // Statements
 
@@ -74,6 +82,21 @@ type VarStmt struct {
 func (*VarStmt) stmtNode()              {}
 func (v *VarStmt) TokenLiteral() string { return v.Token.Kind.String() }
 func (v *VarStmt) Pos() token.Position  { return v.Token.Position }
+func (v *VarStmt) Label() string {
+	s := "var "
+
+	if v.Mutable {
+		s += "mut "
+	}
+
+	s += v.Name.Value
+
+	if v.Type != nil {
+		s += ": " + v.Type.Value
+	}
+
+	return s
+}
 
 type AssignmentStmt struct {
 	Token token.Token // =
@@ -84,6 +107,9 @@ type AssignmentStmt struct {
 func (*AssignmentStmt) stmtNode()              {}
 func (a *AssignmentStmt) TokenLiteral() string { return a.Token.Kind.String() }
 func (a *AssignmentStmt) Pos() token.Position  { return a.Left.Pos() }
+func (*AssignmentStmt) Label() string {
+	return "assign"
+}
 
 type StructStmt struct {
 	Token  token.Token // struct
@@ -94,6 +120,9 @@ type StructStmt struct {
 func (*StructStmt) stmtNode()              {}
 func (s *StructStmt) TokenLiteral() string { return s.Token.Kind.String() }
 func (s *StructStmt) Pos() token.Position  { return s.Token.Position }
+func (s *StructStmt) Label() string {
+	return "struct " + s.Name.Value
+}
 
 type FuncStmt struct {
 	Token      token.Token // fn
@@ -106,6 +135,33 @@ type FuncStmt struct {
 func (*FuncStmt) stmtNode()              {}
 func (f *FuncStmt) TokenLiteral() string { return f.Token.Kind.String() }
 func (f *FuncStmt) Pos() token.Position  { return f.Token.Position }
+func (f *FuncStmt) Label() string {
+	s := "fn " + f.Name.Value + "("
+
+	for i, p := range f.Params {
+		if i != 0 {
+			s += ", "
+		}
+
+		if p.Mutable {
+			s += "mut "
+		}
+
+		s += p.Name.Value
+
+		if p.Type != nil {
+			s += ": " + p.Type.Value
+		}
+	}
+
+	s += ")"
+
+	if f.ReturnType != nil {
+		s += ": " + f.ReturnType.Value
+	}
+
+	return s
+}
 
 type ReturnStmt struct {
 	Token token.Token // return
@@ -115,6 +171,9 @@ type ReturnStmt struct {
 func (*ReturnStmt) stmtNode()              {}
 func (r *ReturnStmt) TokenLiteral() string { return r.Token.Kind.String() }
 func (r *ReturnStmt) Pos() token.Position  { return r.Token.Position }
+func (*ReturnStmt) Label() string {
+	return "return"
+}
 
 type IfStmt struct {
 	Token     token.Token // if
@@ -135,6 +194,9 @@ type ImportCStmt struct {
 func (*ImportCStmt) stmtNode()              {}
 func (i *ImportCStmt) TokenLiteral() string { return i.Token.Kind.String() }
 func (i *ImportCStmt) Pos() token.Position  { return i.Token.Position }
+func (i *ImportCStmt) Label() string {
+	return `importc "` + i.Path.Value + `"`
+}
 
 type ExpressionStmt struct {
 	Token      token.Token
@@ -144,6 +206,12 @@ type ExpressionStmt struct {
 func (*ExpressionStmt) stmtNode()              {}
 func (e *ExpressionStmt) TokenLiteral() string { return e.Token.Kind.String() }
 func (e *ExpressionStmt) Pos() token.Position  { return e.Expression.Pos() }
+func (e *ExpressionStmt) Label() string {
+	if e.Expression != nil {
+		return e.Expression.Label()
+	}
+	return "expr"
+}
 
 // Declarations
 
@@ -153,8 +221,25 @@ type FieldDecl struct {
 	Mutable bool
 }
 
+func (*FieldDecl) declNode() {}
+
 func (f *FieldDecl) TokenLiteral() string { return f.Name.TokenLiteral() }
 func (f *FieldDecl) Pos() token.Position  { return f.Name.Pos() }
+func (f *FieldDecl) Label() string {
+	s := ""
+
+	if f.Mutable {
+		s += "mut "
+	}
+
+	s += f.Name.Value
+
+	if f.Type != nil {
+		s += ": " + f.Type.Value
+	}
+
+	return s
+}
 
 // Expressions
 
@@ -166,6 +251,9 @@ type Identifier struct {
 func (*Identifier) exprNode()              {}
 func (i *Identifier) TokenLiteral() string { return i.Value }
 func (i *Identifier) Pos() token.Position  { return i.Token.Position }
+func (i *Identifier) Label() string {
+	return i.Value
+}
 
 type IntegerLiteral struct {
 	Token token.Token
@@ -175,6 +263,9 @@ type IntegerLiteral struct {
 func (*IntegerLiteral) exprNode()              {}
 func (i *IntegerLiteral) TokenLiteral() string { return fmt.Sprintf("%d", i.Value) }
 func (i *IntegerLiteral) Pos() token.Position  { return i.Token.Position }
+func (i *IntegerLiteral) Label() string {
+	return strconv.FormatInt(i.Value, 10)
+}
 
 type FloatLiteral struct {
 	Token token.Token
@@ -184,6 +275,9 @@ type FloatLiteral struct {
 func (*FloatLiteral) exprNode()              {}
 func (f *FloatLiteral) TokenLiteral() string { return fmt.Sprintf("%f", f.Value) }
 func (f *FloatLiteral) Pos() token.Position  { return f.Token.Position }
+func (f *FloatLiteral) Label() string {
+	return strconv.FormatFloat(f.Value, 'g', -1, 64)
+}
 
 type StringLiteral struct {
 	Token token.Token
@@ -193,6 +287,9 @@ type StringLiteral struct {
 func (*StringLiteral) exprNode()              {}
 func (s *StringLiteral) TokenLiteral() string { return s.Value }
 func (s *StringLiteral) Pos() token.Position  { return s.Token.Position }
+func (s *StringLiteral) Label() string {
+	return strconv.Quote(s.Value)
+}
 
 type CharacterLiteral struct {
 	Token token.Token
@@ -211,6 +308,18 @@ type CallExpr struct {
 func (*CallExpr) exprNode()              {}
 func (c *CallExpr) TokenLiteral() string { return c.Callee.TokenLiteral() }
 func (c *CallExpr) Pos() token.Position  { return c.Callee.Pos() }
+func (c *CallExpr) Label() string {
+	switch callee := c.Callee.(type) {
+	case *Identifier:
+		return "call " + callee.Value
+
+	case *MemberExpr:
+		return "call " + callee.Label()
+
+	default:
+		return "call"
+	}
+}
 
 type BinaryExpr struct {
 	Left     Expr
@@ -221,6 +330,9 @@ type BinaryExpr struct {
 func (*BinaryExpr) exprNode()              {}
 func (b *BinaryExpr) TokenLiteral() string { return b.Operator.Kind.String() }
 func (b *BinaryExpr) Pos() token.Position  { return b.Left.Pos() }
+func (b *BinaryExpr) Label() string {
+	return b.Operator.Kind.String()
+}
 
 type MemberExpr struct {
 	Object   Expr
@@ -230,3 +342,10 @@ type MemberExpr struct {
 func (*MemberExpr) exprNode()              {}
 func (m *MemberExpr) TokenLiteral() string { return m.Property.TokenLiteral() }
 func (m *MemberExpr) Pos() token.Position  { return m.Object.Pos() }
+func (m *MemberExpr) Label() string {
+	if id, ok := m.Object.(*Identifier); ok {
+		return id.Value + "." + m.Property.Value
+	}
+
+	return "." + m.Property.Value
+}
