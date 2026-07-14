@@ -212,12 +212,11 @@ func writeToTempFile(content string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp source: %w", err)
 	}
-	defer func(f *os.File) {
-		err := f.Close()
-		if err != nil {
 
-		}
-	}(f)
+	closeErr := f.Close()
+	if closeErr != nil {
+		return "", fmt.Errorf("failed to close temp source: %w", closeErr)
+	}
 
 	if _, err := f.WriteString(content); err != nil {
 		return "", fmt.Errorf("failed to write temp source: %w", err)
