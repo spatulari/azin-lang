@@ -20,7 +20,6 @@ func New() *Transpiler {
 
 // handleImports handles the import statements in the AST and writes the corresponding C include statements to the buffer.
 func (t *Transpiler) handleImports(program *ast.Program) string {
-	hasImports := false
 	for _, stmt := range program.Statements {
 		if imp, ok := stmt.(*ast.ImportCStmt); ok {
 			header := imp.Path.Value
@@ -28,13 +27,13 @@ func (t *Transpiler) handleImports(program *ast.Program) string {
 				header += ".h"
 			}
 			t.write("#include <" + header + ">\n")
-			hasImports = true
 		}
 	}
 
-	if hasImports {
-		t.newline()
-	}
+	t.write("#include <stdbool.h>") // for bool, true, false because *great* C doesn't have those built-in
+
+	t.newline()
+	t.newline()
 
 	return t.buf.String()
 }

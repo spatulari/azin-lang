@@ -33,6 +33,9 @@ func (t *Transpiler) compileStatement(stmt ast.Stmt) {
 	case *ast.IfStmt:
 		t.compileIf(n)
 
+	case *ast.LoopStmt:
+		t.compileLoop(n)
+
 	case *ast.FuncStmt:
 		t.compileFunc(n)
 
@@ -127,6 +130,13 @@ func (t *Transpiler) compileExpression(expr ast.Expr) {
 	case *ast.Identifier:
 		t.write(n.Value)
 
+	case *ast.BooleanLiteral:
+		if n.Value {
+			t.write("true")
+		} else {
+			t.write("false")
+		}
+
 	case *ast.IntegerLiteral:
 		t.printf("%d", n.Value)
 
@@ -203,5 +213,22 @@ func (t *Transpiler) compileIf(n *ast.IfStmt) {
 		t.write("}")
 	}
 
+	t.newline()
+}
+
+func (t *Transpiler) compileLoop(n *ast.LoopStmt) {
+	t.writeIndent()
+	t.write("for (;;) {\n")
+
+	t.pushIndent()
+
+	for _, stmt := range n.Body {
+		t.compileStatement(stmt)
+	}
+
+	t.popIndent()
+
+	t.writeIndent()
+	t.write("}")
 	t.newline()
 }
