@@ -7,17 +7,16 @@ import (
 
 func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{
-		Statements: []ast.Stmt{},
+		Statements: make([]ast.Stmt, 0, len(p.tokens)/4), // pre-allocate some capacity
 	}
 
 	for !p.isAtEnd() {
 		before := p.current
-		stmt := p.parseStatement()
-
-		if stmt != nil {
+		if stmt := p.parseStatement(); stmt != nil {
 			program.Statements = append(program.Statements, stmt)
 		}
 
+		// If the parser didn't advance, force it to avoid infinite loops
 		if p.current == before {
 			p.advance()
 			p.synchronize()
@@ -33,7 +32,7 @@ func (p *Parser) parseVar() ast.Stmt {
 
 	name := p.parseIdentifier()
 	if name == nil {
-		return &ast.BadStmt{Token: tok}
+		return badStmt(tok)
 	}
 
 	var typ *ast.Identifier
@@ -43,18 +42,13 @@ func (p *Parser) parseVar() ast.Stmt {
 
 	var value ast.Expr
 	if p.match(token.Equal) {
-		value = p.parseExpression(0)
-		if value == nil {
-			return &ast.BadStmt{Token: tok}
-		}
+		value = p.parseExpression(PrecLowest)
 	} else if typ == nil {
 		p.reportError(p.peek(), "expected '=' or an explicit type in variable declaration")
-		return &ast.BadStmt{Token: tok}
+		value = badExpr(p.peek())
 	}
 
-	if !p.statementEnd() {
-		return &ast.BadStmt{Token: tok}
-	}
+	p.consumeStatementEnd()
 
 	return &ast.VarStmt{
 		Token:   tok,
@@ -70,14 +64,11 @@ func (p *Parser) parseImportC() ast.Stmt {
 
 	if !p.check(token.StringLiteral) {
 		p.reportError(p.peek(), "expected string literal after 'importC'")
-		return &ast.BadStmt{Token: tok}
+		return badStmt(tok)
 	}
 
 	path := p.parseStringLiteral()
-
-	if !p.statementEnd() {
-		return &ast.BadStmt{Token: tok}
-	}
+	p.consumeStatementEnd()
 
 	return &ast.ImportCStmt{
 		Token: tok,
@@ -102,37 +93,41 @@ func (p *Parser) parseStatement() ast.Stmt {
 		stmt = p.parseIf()
 	case p.check(token.KwImportC):
 		stmt = p.parseImportC()
+	case p.check(token.KwLoop):
+		stmt = p.parseLoop()
 	default:
 		stmt = p.parseExpressionOrAssignment()
 	}
 
-	if _, ok := stmt.(*ast.BadStmt); ok {
+	if stmt == nil || isBadStmt(stmt) {
 		p.synchronize()
+		if stmt == nil {
+			return badStmt(p.peek())
+		}
 	}
 	return stmt
 }
 
 func (p *Parser) parseExpressionOrAssignment() ast.Stmt {
-	expr := p.parseExpression(0)
+	expr := p.parseExpression(PrecLowest)
+
+	if isBadExpr(expr) {
+		return badStmt(p.peek())
+	}
 
 	if p.check(token.Equal) {
 		tok := p.advance()
 
 		switch expr.(type) {
 		case *ast.Identifier, *ast.MemberExpr:
-			// valid assignment target
-		case *ast.BadExpr:
-			return &ast.BadStmt{Token: tok}
+			// Valid assignment target
 		default:
 			p.reportError(tok, "left side of assignment is not assignable")
-			return &ast.BadStmt{Token: tok}
+			return badStmt(tok)
 		}
 
-		value := p.parseExpression(0)
-
-		if !p.statementEnd() {
-			return &ast.BadStmt{Token: tok}
-		}
+		value := p.parseExpression(PrecLowest)
+		p.consumeStatementEnd()
 
 		return &ast.AssignmentStmt{
 			Token: tok,
@@ -141,9 +136,7 @@ func (p *Parser) parseExpressionOrAssignment() ast.Stmt {
 		}
 	}
 
-	if !p.statementEnd() {
-		return &ast.BadStmt{Token: p.previous()}
-	}
+	p.consumeStatementEnd()
 
 	return &ast.ExpressionStmt{
 		Token:      p.previous(),
@@ -155,52 +148,29 @@ func (p *Parser) parseStruct() ast.Stmt {
 	tok := p.advance()
 	name := p.parseIdentifier()
 	if name == nil {
-		return nil
+		return badStmt(tok) // Without a name, the struct is useless
 	}
+	p.expect(token.KwIs, "after struct name")
 
-	if _, ok := p.expect(token.KwIs, "after struct name"); !ok {
-		return nil
-	}
-	p.skipNewlines()
-
-	fields := []*ast.FieldDecl{}
-
+	var fields []*ast.FieldDecl
 	for !p.isAtEnd() {
 		p.skipNewlines()
-
 		if p.check(token.KwEnd) {
 			break
 		}
 
-		mutable := p.match(token.KwMut)
-		fName := p.parseIdentifier()
-		if fName == nil {
-			return nil
+		field := p.parseFieldDecl(true)
+		if field != nil {
+			fields = append(fields, field)
+		} else {
+			// If field parsing failed, sync to the next newline to try parsing the next field
+			p.synchronize()
 		}
 
-		if _, ok := p.expect(token.Colon, "after field name"); !ok {
-			return nil
-		}
-
-		tName := p.parseType()
-		if tName == nil {
-			return nil
-		}
-
-		if !p.statementEnd() {
-			return nil
-		}
-
-		fields = append(fields, &ast.FieldDecl{
-			Name:    fName,
-			Type:    tName,
-			Mutable: mutable,
-		})
+		p.consumeStatementEnd()
 	}
 
-	if _, ok := p.expect(token.KwEnd, "to close struct"); !ok {
-		return nil
-	}
+	p.expect(token.KwEnd, "to close struct")
 
 	return &ast.StructStmt{
 		Token:  tok,
@@ -210,86 +180,46 @@ func (p *Parser) parseStruct() ast.Stmt {
 }
 
 func (p *Parser) parseType() *ast.Identifier {
-	switch p.peek().Kind {
-	case token.KwUnit, token.KwInt, token.KwFloat, token.KwString, token.KwChar:
+	if isBuiltinType(p.peek().Kind) {
 		tok := p.advance()
 		return &ast.Identifier{Token: tok, Value: p.lexeme(tok)}
-	default:
-		return p.parseIdentifier()
 	}
+	return p.parseIdentifier()
 }
 
 func (p *Parser) parseFunc() ast.Stmt {
 	tok := p.advance()
 	name := p.parseIdentifier()
 	if name == nil {
-		return &ast.BadStmt{Token: tok}
+		return badStmt(tok)
 	}
 
-	params := []*ast.FieldDecl{}
-
+	var params []*ast.FieldDecl
 	if p.match(token.LeftParen) {
-		for !p.isAtEnd() && !p.check(token.RightParen) {
-			pName := p.parseIdentifier()
-			if pName == nil {
-				return &ast.BadStmt{Token: tok}
-			}
-			p.match(token.Colon)
-			pType := p.parseType()
-
-			if pType == nil {
-				return &ast.BadStmt{Token: tok}
-			}
-
-			params = append(params, &ast.FieldDecl{
-				Name: pName,
-				Type: pType,
-			})
-
-			if !p.check(token.RightParen) {
-				if _, ok := p.expect(token.Comma, "between parameters"); !ok {
-					return &ast.BadStmt{Token: tok}
+		if !p.check(token.RightParen) {
+			for {
+				param := p.parseFieldDecl(false)
+				if param != nil {
+					params = append(params, param)
+				}
+				if !p.match(token.Comma) {
+					break
 				}
 			}
 		}
-
-		if _, ok := p.expect(token.RightParen, "after parameter list"); !ok {
-			return &ast.BadStmt{Token: tok}
-		}
+		p.expect(token.RightParen, "after parameter list")
 	}
+
 	var retType *ast.Identifier
 	if p.match(token.Colon) {
 		retType = p.parseType()
-		if retType == nil {
-			return &ast.BadStmt{Token: tok}
-		}
 	}
 
-	if _, ok := p.expect(token.KwDo, "after function declaration"); !ok {
-		return &ast.BadStmt{Token: tok}
-	}
+	p.expect(token.KwDo, "after function declaration")
+	body := p.parseBlock(token.KwEnd)
+	p.expect(token.KwEnd, "to close function")
 
-	p.skipNewlines()
-
-	body := []ast.Stmt{}
-
-	for {
-		p.skipNewlines()
-
-		if p.isAtEnd() || p.check(token.KwEnd) {
-			break
-		}
-
-		stmt := p.parseStatement()
-		if stmt != nil {
-			body = append(body, stmt)
-		}
-	}
-
-	if _, ok := p.expect(token.KwEnd, "to close function"); !ok {
-		return &ast.BadStmt{Token: tok}
-	}
-
+	// Return partial function node even if errors occurred (allows autocomplete to work inside)
 	return &ast.FuncStmt{Token: tok, Name: name, Params: params, ReturnType: retType, Body: body}
 }
 
@@ -298,12 +228,10 @@ func (p *Parser) parseReturn() ast.Stmt {
 	var value ast.Expr
 
 	if !p.checkAny(token.Semicolon, token.Newline, token.KwEnd, token.EOF) {
-		value = p.parseExpression(0)
+		value = p.parseExpression(PrecLowest)
 	}
 
-	if !p.statementEnd() {
-		return &ast.BadStmt{Token: tok}
-	}
+	p.consumeStatementEnd()
 
 	return &ast.ReturnStmt{
 		Token: tok,
@@ -313,40 +241,18 @@ func (p *Parser) parseReturn() ast.Stmt {
 
 func (p *Parser) parseIf() ast.Stmt {
 	tok := p.advance()
+	condition := p.parseExpression(PrecLowest)
 
-	condition := p.parseExpression(0)
-	if _, ok := p.expect(token.KwThen, "after if condition"); !ok {
-		return &ast.BadStmt{Token: tok}
-	}
-
-	p.skipNewlines()
-	var thenBody []ast.Stmt
-
-	for {
-		p.skipNewlines()
-		if p.isAtEnd() || p.checkAny(token.KwElse, token.KwEnd) {
-			break
-		}
-		thenBody = append(thenBody, p.parseStatement())
-	}
+	p.expect(token.KwThen, "after if condition")
+	thenBody := p.parseBlock(token.KwElse, token.KwEnd)
 
 	var elseBody []ast.Stmt
 	if p.match(token.KwElse) {
-		p.skipNewlines()
-		for {
-			p.skipNewlines()
-			if p.isAtEnd() || p.check(token.KwEnd) {
-				break
-			}
-			elseBody = append(elseBody, p.parseStatement())
-		}
+		elseBody = p.parseBlock(token.KwEnd)
 	}
 
 	p.skipNewlines()
-	if _, ok := p.expect(token.KwEnd, "to close if statement"); !ok {
-		return &ast.BadStmt{Token: tok}
-	}
-	p.skipNewlines()
+	p.expect(token.KwEnd, "to close if statement")
 
 	return &ast.IfStmt{
 		Token:     tok,
@@ -361,19 +267,13 @@ func (p *Parser) parseExpression(precedence int) ast.Expr {
 	if left == nil {
 		errTok := p.peek()
 		p.reportError(errTok, "expected expression")
-		return &ast.BadExpr{Token: errTok}
+		return badExpr(errTok)
 	}
 
 	for !p.isAtEnd() {
-		if p.checkAny(
-			token.Newline, token.Semicolon, token.KwEnd,
-			token.KwElse, token.KwThen, token.EOF,
-		) {
-			break
-		}
-
 		nextPrec := getPrecedence(p.peek().Kind)
-		if nextPrec == 0 || precedence >= nextPrec {
+
+		if nextPrec == PrecLowest || precedence >= nextPrec {
 			break
 		}
 
@@ -386,11 +286,18 @@ func (p *Parser) parseExpression(precedence int) ast.Expr {
 func (p *Parser) parsePrefix() ast.Expr {
 	switch {
 	case p.check(token.Identifier):
-		id := p.parseIdentifier()
-		if id == nil {
-			return &ast.BadExpr{Token: p.peek()}
+		tok := p.peek()
+		val := p.lexeme(tok)
+
+		if val == "true" || val == "false" {
+			p.advance()
+			return &ast.BooleanLiteral{
+				Token: tok,
+				Value: val == "true",
+			}
 		}
-		return id
+		return p.parseIdentifier()
+
 	case p.check(token.IntegerLiteral):
 		return p.parseIntegerLiteral()
 	case p.check(token.FloatLiteral):
@@ -406,27 +313,24 @@ func (p *Parser) parsePrefix() ast.Expr {
 
 func (p *Parser) parseInfix(left ast.Expr, nextPrec int) ast.Expr {
 	switch {
-	case p.check(token.LeftParen):
-		tok := p.advance() // Consume '('
+	case p.match(token.LeftParen):
 		var args []ast.Expr
-		for !p.check(token.RightParen) {
-			args = append(args, p.parseExpression(0))
-			if !p.check(token.RightParen) {
-				if _, ok := p.expect(token.Comma, "between arguments"); !ok {
-					return &ast.BadExpr{Token: tok}
+
+		if !p.check(token.RightParen) {
+			for {
+				args = append(args, p.parseExpression(PrecLowest))
+				if !p.match(token.Comma) {
+					break
 				}
 			}
 		}
-		if _, ok := p.expect(token.RightParen, "to close argument list"); !ok {
-			return &ast.BadExpr{Token: tok}
-		}
+		p.expect(token.RightParen, "to close argument list")
 		return &ast.CallExpr{Callee: left, Args: args}
 
-	case p.check(token.Dot):
-		tok := p.advance() // Consume '.'
+	case p.match(token.Dot):
 		prop := p.parseIdentifier()
 		if prop == nil {
-			return &ast.BadExpr{Token: tok}
+			return badExpr(p.previous())
 		}
 		return &ast.MemberExpr{Object: left, Property: prop}
 
@@ -439,13 +343,38 @@ func (p *Parser) parseInfix(left ast.Expr, nextPrec int) ast.Expr {
 
 func (p *Parser) parseIdentifier() *ast.Identifier {
 	tok, ok := p.expect(token.Identifier, "")
-
 	if !ok {
 		return nil
 	}
-
 	return &ast.Identifier{
 		Token: tok,
 		Value: p.lexeme(tok),
+	}
+}
+
+func (p *Parser) parseFieldDecl(allowMut bool) *ast.FieldDecl {
+	var mutable bool
+	if allowMut {
+		mutable = p.match(token.KwMut)
+	}
+
+	name := p.parseIdentifier()
+	if name == nil {
+		return nil
+	}
+
+	if _, ok := p.expect(token.Colon, "after name"); !ok {
+		return nil
+	}
+
+	tName := p.parseType()
+	if tName == nil {
+		return nil
+	}
+
+	return &ast.FieldDecl{
+		Name:    name,
+		Type:    tName,
+		Mutable: mutable,
 	}
 }

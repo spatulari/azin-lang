@@ -21,6 +21,7 @@ var (
 	debug           = flag.Bool("debug", false, "Enable debug output")
 	printTokens     = flag.Bool("print-tokens", false, "Print lexer tokens")
 	printAST        = flag.Bool("print-ast", false, "Print the parsed AST")
+	optimization    = flag.String("O", "0", "Optimization level (0,1,2,3,s,z) (default \"0\")")
 	output          = flag.String("o", "", "Output file")
 	ignoreExtension = flag.Bool("ignore-extension", false, "Ignore source file extension")
 	version         = flag.Bool("version", false, "Print compiler version")
@@ -87,7 +88,14 @@ func main() {
 		fatal(parseErr)
 	}
 
-	err := compiler.Compile(file, *output, *emitC)
+	opts := compiler.Options{
+		Output:       *output,
+		EmitC:        *emitC,
+		Optimization: *optimization,
+		Debug:        *debug,
+	}
+
+	err := compiler.Compile(file, *output, opts)
 	if err != nil {
 		fatal(err)
 	}

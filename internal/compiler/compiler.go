@@ -81,7 +81,7 @@ type compiler struct {
 	run  func(string, string, string) error
 }
 
-func runCompiler(sourcePath, exeName string) error {
+func runCompiler(sourcePath, exeName string, opts Options) error {
 	var compilers []compiler
 
 	switch runtime.GOOS {
@@ -107,7 +107,7 @@ func runCompiler(sourcePath, exeName string) error {
 
 	for _, c := range compilers {
 		if path, err := exec.LookPath(c.name); err == nil {
-			return c.run(path, sourcePath, exeName)
+			return c.run(path, sourcePath, exeName, opts)
 		}
 	}
 
