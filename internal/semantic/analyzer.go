@@ -464,7 +464,7 @@ func (a *Analyzer) inferExprType(expr ast.Expr) *ast.Identifier {
 			a.errorf(n.Callee, "'%s' is not callable", id.Value)
 			return nil
 		}
-    
+
 		if sym.Inferring {
 			return nil
 		}
