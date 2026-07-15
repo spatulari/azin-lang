@@ -2,8 +2,9 @@ package semantic
 
 // Scope represents a lexical scope in the source code. It contains a reference to its parent scope and a map of symbols defined within that scope.
 type Scope struct {
-	Parent  *Scope
-	Symbols map[string]*Symbol
+	Parent    *Scope
+	Symbols   map[string]*Symbol
+	Functions map[string][]*Symbol
 }
 
 func (a *Analyzer) pushScope() {
@@ -13,8 +14,9 @@ func (a *Analyzer) pushScope() {
 	}
 
 	a.scopes = append(a.scopes, &Scope{
-		Parent:  parent,
-		Symbols: map[string]*Symbol{},
+		Parent:    parent,
+		Symbols:   map[string]*Symbol{},
+		Functions: map[string][]*Symbol{},
 	})
 }
 

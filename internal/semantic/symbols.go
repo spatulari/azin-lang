@@ -36,12 +36,72 @@ func (a *Analyzer) lookup(name string) *Symbol {
 	return nil
 }
 
+func (a *Analyzer) lookupFunctions(name string) []*Symbol {
+	for scope := a.currentScope(); scope != nil; scope = scope.Parent {
+		if syms, ok := scope.Functions[name]; ok {
+			return syms
+		}
+	}
+
+	return nil
+}
+
 func (a *Analyzer) declare(sym *Symbol) {
 	if existing := a.currentScope().Symbols[sym.Name]; existing != nil {
 		a.errorfSym(sym, "redeclaration of '%s'", sym.Name)
 		return
 	}
+	if existing := a.currentScope().Functions[sym.Name]; len(existing) != 0 {
+		a.errorfSym(sym, "redeclaration of '%s'", sym.Name)
+		return
+	}
 	a.currentScope().Symbols[sym.Name] = sym
+}
+
+func sameParamTypes(left, right *ast.FuncStmt) bool {
+	if len(left.Params) != len(right.Params) {
+		return false
+	}
+
+	for i := range left.Params {
+		if left.Params[i].Type == nil || right.Params[i].Type == nil {
+			return false
+		}
+
+		if left.Params[i].Type.Value != right.Params[i].Type.Value {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (a *Analyzer) declareFunction(sym *Symbol) {
+	if existing := a.currentScope().Symbols[sym.Name]; existing != nil {
+		a.errorfSym(sym, "redeclaration of '%s'", sym.Name)
+		return
+	}
+
+	for _, existing := range a.currentScope().Functions[sym.Name] {
+		if sameParamTypes(existing.Function, sym.Function) {
+			a.errorfSym(sym, "redeclaration of '%s'", sym.Name)
+			return
+		}
+	}
+
+	a.currentScope().Functions[sym.Name] = append(a.currentScope().Functions[sym.Name], sym)
+}
+
+func (a *Analyzer) lookupFunctionSymbol(fn *ast.FuncStmt) *Symbol {
+	for scope := a.currentScope(); scope != nil; scope = scope.Parent {
+		for _, sym := range scope.Functions[fn.Name.Value] {
+			if sym.Function == fn {
+				return sym
+			}
+		}
+	}
+
+	return nil
 }
 
 func (a *Analyzer) errorfSym(sym *Symbol, format string, args ...any) {

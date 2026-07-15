@@ -27,6 +27,202 @@ func New(diag *diagnostics.Engine) *Analyzer {
 	}
 }
 
+func mangleFunctionName(fn *ast.FuncStmt) string {
+	if len(fn.Params) == 0 {
+		return fn.Name.Value + "__unit"
+	}
+
+	name := fn.Name.Value
+	for _, param := range fn.Params {
+		name += "__" + param.Type.Value
+	}
+
+	return name
+}
+
+func (a *Analyzer) assignFunctionCNames() {
+	scope := a.currentScope()
+
+	for name, overloads := range scope.Functions {
+		if len(overloads) == 1 {
+			overloads[0].Function.CName = name
+			continue
+		}
+
+		for _, overload := range overloads {
+			overload.Function.CName = mangleFunctionName(overload.Function)
+		}
+	}
+}
+
+func (a *Analyzer) resolveCallExpr(n *ast.CallExpr) *Symbol {
+	id, ok := n.Callee.(*ast.Identifier)
+	if !ok {
+		return nil
+	}
+
+	overloads := a.lookupFunctions(id.Value)
+	if len(overloads) == 0 {
+		n.ResolvedName = id.Value
+		return nil
+	}
+
+	var sameArity bool
+	for _, overload := range overloads {
+		if len(n.Args) == len(overload.Function.Params) {
+			sameArity = true
+			break
+		}
+	}
+
+	if !sameArity {
+		a.errorf(n.Callee, "wrong number of arguments to %s", id.Value)
+		return nil
+	}
+
+	argTypes := make([]*ast.Identifier, len(n.Args))
+	for i, arg := range n.Args {
+		argTypes[i] = a.inferExprType(arg)
+	}
+
+	sym := a.resolveCallOverload(id.Value, argTypes)
+	if sym == nil {
+		a.errorf(n.Callee, "no matching overload for %s", id.Value)
+		return nil
+	}
+
+	n.ResolvedName = sym.Function.CName
+	return sym
+}
+
+func (a *Analyzer) analyzeExpr(expr ast.Expr) {
+	switch n := expr.(type) {
+	case nil, *ast.BadExpr:
+		return
+
+	case *ast.CallExpr:
+		a.analyzeExpr(n.Callee)
+		for _, arg := range n.Args {
+			a.analyzeExpr(arg)
+		}
+		a.resolveCallExpr(n)
+
+	case *ast.BinaryExpr:
+		a.analyzeExpr(n.Left)
+		a.analyzeExpr(n.Right)
+
+	case *ast.MemberExpr:
+		a.analyzeExpr(n.Object)
+	}
+}
+
+func (a *Analyzer) verifyResolvedCalls(program *ast.Program) {
+	var visitExpr func(ast.Expr)
+	var visitStmt func(ast.Stmt)
+
+	visitExpr = func(expr ast.Expr) {
+		switch n := expr.(type) {
+		case nil, *ast.BadExpr:
+			return
+
+		case *ast.CallExpr:
+			if n.ResolvedName == "" {
+				a.errorf(n.Callee, "internal compiler error: unresolved function call")
+			}
+
+			visitExpr(n.Callee)
+			for _, arg := range n.Args {
+				visitExpr(arg)
+			}
+
+		case *ast.BinaryExpr:
+			visitExpr(n.Left)
+			visitExpr(n.Right)
+
+		case *ast.MemberExpr:
+			visitExpr(n.Object)
+		}
+	}
+
+	visitStmt = func(stmt ast.Stmt) {
+		switch n := stmt.(type) {
+		case *ast.BadStmt, *ast.ImportCStmt, *ast.StructStmt, *ast.EnumStmt, *ast.StopStmt:
+			return
+
+		case *ast.FuncStmt:
+			for _, stmt := range n.Body {
+				visitStmt(stmt)
+			}
+
+		case *ast.ReturnStmt:
+			visitExpr(n.Value)
+
+		case *ast.VarStmt:
+			visitExpr(n.Value)
+
+		case *ast.IfStmt:
+			visitExpr(n.Condition)
+			for _, stmt := range n.Then {
+				visitStmt(stmt)
+			}
+			for _, stmt := range n.Else {
+				visitStmt(stmt)
+			}
+
+		case *ast.LoopStmt:
+			for _, stmt := range n.Body {
+				visitStmt(stmt)
+			}
+
+		case *ast.AssignmentStmt:
+			visitExpr(n.Left)
+			visitExpr(n.Value)
+
+		case *ast.ExpressionStmt:
+			visitExpr(n.Expression)
+		}
+	}
+
+	for _, stmt := range program.Statements {
+		visitStmt(stmt)
+	}
+}
+
+func (a *Analyzer) resolveCallOverload(name string, argTypes []*ast.Identifier) *Symbol {
+	overloads := a.lookupFunctions(name)
+	if len(overloads) == 0 {
+		return nil
+	}
+
+	var matches []*Symbol
+
+	for _, overload := range overloads {
+		if len(argTypes) != len(overload.Function.Params) {
+			continue
+		}
+
+		match := true
+		for i, got := range argTypes {
+			want := overload.Function.Params[i].Type
+
+			if got == nil || want == nil || got.Value != want.Value {
+				match = false
+				break
+			}
+		}
+
+		if match {
+			matches = append(matches, overload)
+		}
+	}
+
+	if len(matches) == 1 {
+		return matches[0]
+	}
+
+	return nil
+}
+
 func (a *Analyzer) errorf(node ast.Node, format string, args ...any) {
 	a.diag.ReportError(
 		node.Pos(),
@@ -46,7 +242,7 @@ func (a *Analyzer) Analyze(program *ast.Program) error {
 		switch n := stmt.(type) {
 
 		case *ast.FuncStmt:
-			a.declare(&Symbol{
+			a.declareFunction(&Symbol{
 				Name:     n.Name.Value,
 				Type:     n.ReturnType,
 				Kind:     SymbolFunction,
@@ -69,6 +265,8 @@ func (a *Analyzer) Analyze(program *ast.Program) error {
 		}
 	}
 
+	a.assignFunctionCNames()
+
 	// Infer function return types before semantic analysis.
 	//for _, stmt := range program.Statements {
 	//	if fn, ok := stmt.(*ast.FuncStmt); ok {
@@ -84,6 +282,8 @@ func (a *Analyzer) Analyze(program *ast.Program) error {
 	for _, stmt := range program.Statements {
 		a.visitStatement(stmt)
 	}
+
+	a.verifyResolvedCalls(program)
 
 	return a.diag.Err()
 }
@@ -150,7 +350,7 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 		if n.ReturnType == nil {
 			a.inferFunctionReturnType(n)
 
-			if sym := a.lookup(n.Name.Value); sym != nil {
+			if sym := a.lookupFunctionSymbol(n); sym != nil {
 				sym.Type = n.ReturnType
 			}
 		}
@@ -231,7 +431,6 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 		})
 
 	case *ast.IfStmt:
-
 		cond := a.inferExprType(n.Condition)
 		if cond != nil && cond.Value != "bool" {
 			a.errorf(n.Condition, "if condition must be bool, got %s", cond.Value)
@@ -343,6 +542,9 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 		default:
 			a.errorf(n.Value, "left side of assignment is not assignable")
 		}
+
+	case *ast.ExpressionStmt:
+		a.analyzeExpr(n.Expression)
 	}
 }
 
@@ -387,7 +589,7 @@ func (a *Analyzer) inferFunctionReturnType(fn *ast.FuncStmt) {
 		return
 	}
 
-	sym := a.lookup(fn.Name.Value)
+	sym := a.lookupFunctionSymbol(fn)
 	if sym != nil {
 		if sym.Inferring {
 			return
@@ -449,19 +651,8 @@ func (a *Analyzer) inferExprType(expr ast.Expr) *ast.Identifier {
 		return nil
 
 	case *ast.CallExpr:
-		id, ok := n.Callee.(*ast.Identifier)
-		if !ok {
-			return nil
-		}
-
-		sym := a.lookup(id.Value)
+		sym := a.resolveCallExpr(n)
 		if sym == nil {
-			// Could be an external C function
-			return nil
-		}
-
-		if sym.Kind != SymbolFunction {
-			a.errorf(n.Callee, "'%s' is not callable", id.Value)
 			return nil
 		}
 
@@ -471,31 +662,6 @@ func (a *Analyzer) inferExprType(expr ast.Expr) *ast.Identifier {
 
 		if sym.Type == nil {
 			a.inferFunctionReturnType(sym.Function)
-		}
-
-		if len(n.Args) != len(sym.Function.Params) {
-			a.errorf(n.Callee, "wrong number of arguments to %s", id.Value)
-			return nil
-		}
-
-		for i, arg := range n.Args {
-			got := a.inferExprType(arg)
-			want := sym.Function.Params[i].Type
-
-			if got == nil {
-				continue
-			}
-
-			if got.Value != want.Value {
-				a.errorf(
-					arg,
-					"argument %d of %s: expected %s, got %s",
-					i+1,
-					id.Value,
-					want.Value,
-					got.Value,
-				)
-			}
 		}
 
 		return sym.Type

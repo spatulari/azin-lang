@@ -143,6 +143,7 @@ type FuncStmt struct {
 	Params     []*FieldDecl
 	ReturnType *Identifier
 	Body       []Stmt
+	CName      string
 }
 
 func (*FuncStmt) stmtNode()              {}
@@ -357,8 +358,9 @@ func (b *BooleanLiteral) Label() string {
 }
 
 type CallExpr struct {
-	Callee Expr
-	Args   []Expr
+	Callee       Expr
+	Args         []Expr
+	ResolvedName string
 }
 
 func (*CallExpr) exprNode()              {}

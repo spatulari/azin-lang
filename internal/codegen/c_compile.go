@@ -123,7 +123,12 @@ func (t *Transpiler) compileFunc(fn *ast.FuncStmt) {
 		panic("internal compiler error: function has no resolved return type")
 	}
 
-	t.printf("%s %s(", emitType(fn.ReturnType.Value), fn.Name.Value)
+	name := fn.Name.Value
+	if fn.CName != "" {
+		name = fn.CName
+	}
+
+	t.printf("%s %s(", emitType(fn.ReturnType.Value), name)
 
 	for i, p := range fn.Params {
 		if p.Type == nil {
@@ -194,7 +199,10 @@ func (t *Transpiler) compileExpression(expr ast.Expr) {
 		t.compileExpression(n.Right)
 
 	case *ast.CallExpr:
-		t.compileExpression(n.Callee)
+		if n.ResolvedName == "" {
+			panic("internal compiler error: unresolved function call")
+		}
+		t.write(n.ResolvedName)
 		t.write("(")
 
 		for i, arg := range n.Args {
