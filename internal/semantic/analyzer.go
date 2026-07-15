@@ -149,6 +149,10 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 
 		if n.ReturnType == nil {
 			a.inferFunctionReturnType(n)
+
+			if sym := a.lookup(n.Name.Value); sym != nil {
+				sym.Type = n.ReturnType
+			}
 		}
 
 		// TODO(0.3.0): This only checks whether a return statement exists.
@@ -460,6 +464,7 @@ func (a *Analyzer) inferExprType(expr ast.Expr) *ast.Identifier {
 			a.errorf(n.Callee, "'%s' is not callable", id.Value)
 			return nil
 		}
+
 		if sym.Inferring {
 			return nil
 		}
