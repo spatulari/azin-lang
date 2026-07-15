@@ -404,7 +404,9 @@ func (a *Analyzer) inferExprType(expr ast.Expr) *ast.Identifier {
 
 		sym := a.lookup(id.Value)
 		if sym == nil || sym.Kind != SymbolFunction {
-			a.errorf(n.Callee, "unknown function: %s", id.Value)
+			// IMPORTANT: Commented out because Azin has no way to know if the function is from C.
+			// And we are definitely not parsing C
+			// a.errorf(n.Callee, "unknown function: %s", id.Value)
 			return nil
 		}
 
