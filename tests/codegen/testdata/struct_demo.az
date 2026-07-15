@@ -1,0 +1,14 @@
+importc "stdio.h"
+
+struct Point is
+    x: int;
+    y: int;
+end
+
+fn distance(a: Point, b: Point): int do
+    return a.x + b.y;
+end
+
+fn main: int do
+    return 0;
+end

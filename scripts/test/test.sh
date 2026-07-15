@@ -1,4 +1,14 @@
 #!/usr/bin/env bash
-# BIN="go run ./cmd/azc"
+set -euo pipefail
 
-go run ./cmd/azc -version
+echo "============================================"
+echo "  Azin Compiler Test Suite"
+echo "============================================"
+echo ""
+
+go test -v -count=1 -cover ./tests/... 2>&1
+
+echo ""
+echo "============================================"
+echo "  All tests completed."
+echo "============================================"

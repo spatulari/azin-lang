@@ -1,0 +1,16 @@
+#include <stdio.h>
+#include <stdbool.h>
+
+typedef struct {
+    int x;
+    int y;
+} Point;
+
+
+int distance(Point a, Point b) {
+    return a.x + b.y;
+}
+
+int main() {
+    return 0;
+}

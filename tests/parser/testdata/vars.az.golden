@@ -1,0 +1,21 @@
+╰── Program "Program"
+    ╰── Statements
+        ╰── FuncStmt "fn main(): int"
+            ├── Name: main
+            ├── ReturnType: int
+            ╰── Body
+                ├── VarStmt "var x: int"
+                │   ├── Name: x
+                │   ├── Type: int
+                │   ╰── Value: 42
+                ├── VarStmt "var mut y: float"
+                │   ├── Name: y
+                │   ├── Type: float
+                │   ├── Value: 3.14
+                │   ╰── Mutable: ✅
+                ├── VarStmt "var name: string"
+                │   ├── Name: name
+                │   ├── Type: string
+                │   ╰── Value: "azin"
+                ╰── ReturnStmt "return"
+                    ╰── Value: 0

@@ -1,0 +1,8 @@
+╰── Program "Program"
+    ╰── Statements
+        ╰── FuncStmt "fn main(): int"
+            ├── Name: main
+            ├── ReturnType: int
+            ╰── Body
+                ╰── ReturnStmt "return"
+                    ╰── Value: 0

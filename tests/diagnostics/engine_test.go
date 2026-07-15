@@ -1,0 +1,155 @@
+package diagnostics_test
+
+import (
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/azin-lang/Azin/internal/diagnostics"
+	"github.com/azin-lang/Azin/internal/source"
+	"github.com/azin-lang/Azin/internal/token"
+)
+
+func newTestEngine(text string) (*diagnostics.Engine, *source.File) {
+	file := source.New("test.az", []byte(text))
+	return diagnostics.New(file), file
+}
+
+func TestReportError(t *testing.T) {
+	diag, _ := newTestEngine("hello world")
+	diag.ReportError(token.Position{Offset: 0}, 5, "test error")
+
+	if !diag.HasErrors() {
+		t.Error("HasErrors() = false after reporting error")
+	}
+	if diag.Err() == nil {
+		t.Error("Err() = nil after reporting error")
+	}
+}
+
+func TestReportWarning(t *testing.T) {
+	diag, _ := newTestEngine("hello world")
+	diag.ReportWarning(token.Position{Offset: 0}, 5, "test warning")
+
+	if diag.HasErrors() {
+		t.Error("HasErrors() = true after reporting only warnings")
+	}
+}
+
+func TestReportNote(t *testing.T) {
+	diag, _ := newTestEngine("hello world")
+	diag.ReportNote(token.Position{Offset: 0}, 5, "test note")
+
+	if diag.HasErrors() {
+		t.Error("HasErrors() = true after reporting only notes")
+	}
+}
+
+func TestNoErrors(t *testing.T) {
+	diag, _ := newTestEngine("hello world")
+	if diag.HasErrors() {
+		t.Error("HasErrors() = true with no diagnostics")
+	}
+	if diag.Err() != nil {
+		t.Error("Err() != nil with no diagnostics")
+	}
+}
+
+func TestDiagnosticsCollection(t *testing.T) {
+	diag, _ := newTestEngine("hello world")
+	diag.ReportError(token.Position{Offset: 0}, 5, "first error")
+	diag.ReportWarning(token.Position{Offset: 6}, 5, "a warning")
+	diag.ReportError(token.Position{Offset: 0}, 3, "second error")
+
+	all := diag.Diagnostics()
+	if len(all) != 3 {
+		t.Fatalf("got %d diagnostics, want 3", len(all))
+	}
+
+	if all[0].Kind != diagnostics.Error {
+		t.Errorf("first diagnostic kind = %d, want %d", all[0].Kind, diagnostics.Error)
+	}
+	if all[1].Kind != diagnostics.Warning {
+		t.Errorf("second diagnostic kind = %d, want %d", all[1].Kind, diagnostics.Warning)
+	}
+	if all[2].Kind != diagnostics.Error {
+		t.Errorf("third diagnostic kind = %d, want %d", all[2].Kind, diagnostics.Error)
+	}
+}
+
+func TestErrorOutputContainsSourceSnippet(t *testing.T) {
+	diag, _ := newTestEngine("line one\nline two\nline three")
+	diag.ReportError(token.Position{Offset: 0}, 4, "something went wrong")
+
+	err := diag.Err()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	msg := err.Error()
+	if !strings.Contains(msg, "test.az") {
+		t.Errorf("error missing filename, got: %s", msg)
+	}
+	if !strings.Contains(msg, "line one") {
+		t.Errorf("error missing source line, got: %s", msg)
+	}
+	if !strings.Contains(msg, "error") {
+		t.Errorf("error missing severity, got: %s", msg)
+	}
+}
+
+func TestConcurrentSafety(t *testing.T) {
+	diag, _ := newTestEngine("hello world")
+
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			diag.ReportError(token.Position{Offset: 0}, 5, "concurrent error")
+			diag.HasErrors()
+			diag.Diagnostics()
+			diag.Err()
+		}()
+	}
+	wg.Wait()
+
+	all := diag.Diagnostics()
+	if len(all) != 20 {
+		t.Errorf("got %d diagnostics, want 20", len(all))
+	}
+}
+
+func TestErrorOutputFormatsPosition(t *testing.T) {
+	diag, _ := newTestEngine("fn main() do\n    return 0;\nend")
+	diag.ReportError(token.Position{Offset: 3}, 4, "something wrong")
+
+	msg := diag.Err().Error()
+	if !strings.Contains(msg, "test.az:1:4") {
+		t.Errorf("error missing correct position, got: %s", msg)
+	}
+}
+
+func TestMultipleErrors(t *testing.T) {
+	diag, _ := newTestEngine("line1\nline2\nline3")
+	diag.ReportError(token.Position{Offset: 0}, 3, "first")
+	diag.ReportError(token.Position{Offset: 6}, 3, "second")
+
+	msg := diag.Err().Error()
+	lines := strings.Count(msg, "error:")
+	if lines != 2 {
+		t.Errorf("expected 2 errors in output, got %d", lines)
+	}
+}
+
+func TestWarningWithoutError(t *testing.T) {
+	diag, _ := newTestEngine("hello")
+	diag.ReportWarning(token.Position{Offset: 0}, 5, "just a warning")
+
+	if diag.HasErrors() {
+		t.Error("HasErrors() should be false with only warnings")
+	}
+	if diag.Err() != nil {
+		t.Error("Err() should be nil with only warnings")
+	}
+}

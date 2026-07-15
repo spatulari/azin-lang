@@ -1,0 +1,14 @@
+╰── Program "Program"
+    ╰── Statements
+        ╰── FuncStmt "fn test(): int"
+            ├── Name: test
+            ├── ReturnType: int
+            ╰── Body
+                ╰── IfStmt "if"
+                    ├── Condition: ✅
+                    ├── Then
+                    │   ╰── ReturnStmt "return"
+                    │       ╰── Value: 1
+                    ╰── Else
+                        ╰── ReturnStmt "return"
+                            ╰── Value: 2
