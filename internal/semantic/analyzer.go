@@ -69,11 +69,7 @@ func (a *Analyzer) Analyze(program *ast.Program) error {
 		}
 	}
 
-	// Analyze every statement.
-	for _, stmt := range program.Statements {
-		a.visitStatement(stmt)
-	}
-
+	// Infer function return types before semantic analysis.
 	for _, stmt := range program.Statements {
 		if fn, ok := stmt.(*ast.FuncStmt); ok {
 			a.inferFunctionReturnType(fn)
@@ -83,6 +79,10 @@ func (a *Analyzer) Analyze(program *ast.Program) error {
 				sym.Type = fn.ReturnType
 			}
 		}
+	}
+
+	for _, stmt := range program.Statements {
+		a.visitStatement(stmt)
 	}
 
 	return a.diag.Err()
@@ -147,8 +147,6 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 			a.visitStatement(stmt)
 		}
 
-		a.popScope()
-
 		// TODO(0.3.0): This only checks whether a return statement exists.
 		// It does not verify that all execution paths return a value.
 		// It also cannot detect inconsistent return types across different
@@ -172,6 +170,8 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 				)
 			}
 		}
+
+		a.popScope()
 
 	case *ast.ReturnStmt:
 		if a.currentFunction == nil {
