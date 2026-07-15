@@ -59,6 +59,13 @@ func (a *Analyzer) Analyze(program *ast.Program) error {
 				Kind:   SymbolStruct,
 				Struct: n,
 			})
+
+		case *ast.EnumStmt:
+			a.declare(&Symbol{
+				Name: n.Name.Value,
+				Kind: SymbolEnum,
+				Enum: n,
+			})
 		}
 	}
 
@@ -100,6 +107,14 @@ func (a *Analyzer) lookupField(strct *ast.StructStmt, name string) *ast.FieldDec
 	return nil
 }
 
+func (a *Analyzer) checkEnumShadow(name *ast.Identifier) bool {
+	if sym := a.lookup(name.Value); sym != nil && sym.Kind == SymbolEnum {
+		a.errorf(name, "cannot shadow enum '%s' with a variable", name.Value)
+		return true
+	}
+	return false
+}
+
 func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 	switch n := stmt.(type) {
 
@@ -117,6 +132,10 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 
 		// Register parameters.
 		for _, param := range n.Params {
+			if a.checkEnumShadow(param.Name) {
+				continue
+			}
+
 			a.declare(&Symbol{
 				Name: param.Name.Value,
 				Type: param.Type,
@@ -198,6 +217,10 @@ func (a *Analyzer) visitStatement(stmt ast.Stmt) {
 					got.Value,
 				)
 			}
+		}
+
+		if a.checkEnumShadow(n.Name) {
+			return
 		}
 
 		a.declare(&Symbol{
@@ -441,7 +464,7 @@ func (a *Analyzer) inferExprType(expr ast.Expr) *ast.Identifier {
 			a.errorf(n.Callee, "'%s' is not callable", id.Value)
 			return nil
 		}
-
+    
 		if sym.Inferring {
 			return nil
 		}
@@ -523,6 +546,20 @@ func (a *Analyzer) inferExprType(expr ast.Expr) *ast.Identifier {
 		return nil
 
 	case *ast.MemberExpr:
+		// the object is a type name used as a namespace, so it must be resolved before type inference
+		if id, ok := n.Object.(*ast.Identifier); ok {
+			if sym := a.lookup(id.Value); sym != nil && sym.Kind == SymbolEnum {
+				for _, variant := range sym.Enum.Variants {
+					if variant.Value == n.Property.Value {
+						return &ast.Identifier{Value: sym.Enum.Name.Value}
+					}
+				}
+
+				a.errorf(n.Property, "enum '%s' has no variant '%s'", sym.Enum.Name.Value, n.Property.Value)
+				return nil
+			}
+		}
+
 		objectType := a.inferExprType(n.Object)
 		if objectType == nil {
 			return nil
